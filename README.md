@@ -1,218 +1,133 @@
-# Personal Finance Management System
+# Personal Finance Manager
 
-A comprehensive personal finance management application that helps you track accounts, create budgets, and plan for your financial future.
+A comprehensive personal finance application with YNAB-style envelope budgeting, transaction tracking, and financial analytics.
 
 ## Features
 
-- **Account Management**: Track multiple financial accounts (bank, investment, loans) in one place
-- **Transaction Management**:
-  - Centralized transaction history with categorization
-  - Table and List views for transactions
-  - Inline editing capabilities
-  - Real-time balance updates
-  - Transaction categorization and filtering
-- **Authentication**:
-  - Secure session-based authentication
-  - User registration and login
-  - Protected routes and API endpoints
-- **Dashboard**:
-  - Overview of all accounts and financial status
-  - Total balance calculation
-  - Recent transaction history
-- **User Experience**:
-  - Responsive Material-UI design
-  - Intuitive navigation
-  - Real-time updates
-  - Error handling and validation
+- **Dashboard**: Get an overview of your financial health with key metrics and visualizations
+- **Accounts Management**: Track multiple accounts and their balances
+- **Transaction Tracking**: Record and categorize your income and expenses
+- **Scheduled Transactions**: Set up recurring transactions that automatically process
+- **YNAB-Style Budgeting**: Allocate every dollar to specific categories using the envelope method
+- **Categories Management**: Create and organize categories and subcategories for your transactions
+- **Analytics**: Visualize your spending patterns, income sources, and financial trends
+- **Data Import**: Import transaction data from CSV files
 
 ## Tech Stack
 
-### Backend
+- **Frontend**: React, Material-UI, Chart.js
+- **Backend**: Flask (Python)
+- **Database**: SQLite (easily upgradable to PostgreSQL or MySQL)
 
-- Java 17
-- Spring Boot
-- Spring Security (Session-based authentication)
-- Maven
-- PostgreSQL
-- JUnit for testing
-
-### Frontend
-
-- React 18
-- TypeScript
-- Material-UI (MUI)
-- Chart.js for visualizations
-- Axios for API communication
-- Jest for testing
-
-## Project Structure
-
-```
-personal-finance/
-├── backend/                 # Java/Maven backend
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   ├── controller/    # REST controllers
-│   │   │   │   ├── service/       # Business logic
-│   │   │   │   ├── repository/    # Data access
-│   │   │   │   ├── model/         # Domain models
-│   │   │   │   ├── security/      # Authentication
-│   │   │   │   └── dto/           # Data transfer objects
-│   │   │   └── resources/  # Configuration files
-│   │   └── test/           # Test files
-│   └── pom.xml             # Maven configuration
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/         # Page components
-│   │   │   ├── Dashboard/  # Dashboard views
-│   │   │   ├── Transactions/ # Transaction management
-│   │   │   └── Auth/      # Authentication pages
-│   │   ├── services/      # API services
-│   │   └── utils/         # Utility functions
-│   ├── package.json       # NPM configuration
-│   └── tsconfig.json      # TypeScript configuration
-└── README.md              # Project documentation
-```
-
-## Getting Started
+## Setup Instructions
 
 ### Prerequisites
 
-- Java 17 or higher
-- Node.js 16 or higher
-- Maven
-- PostgreSQL
+- Node.js (v14+)
+- Python (v3.8+)
+- pip
 
 ### Backend Setup
 
 1. Navigate to the backend directory:
 
-   ```bash
+   ```
    cd backend
    ```
 
-2. Create a PostgreSQL database named 'personal_finance'
+2. Create and activate a virtual environment:
 
-3. Update `application.properties` with your database credentials
-
-4. Run the application:
-   ```bash
-   mvn clean install
-   mvn spring-boot:run
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-The backend will start on `http://localhost:8080`
+3. Install dependencies:
+
+   ```
+   pip install -r requirements.txt
+   ```
+
+4. Run the backend server:
+   ```
+   python run.py
+   ```
+   The backend will run on http://127.0.0.1:5002/api
 
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
 
-   ```bash
+   ```
    cd frontend
    ```
 
 2. Install dependencies:
 
-   ```bash
+   ```
    npm install
    ```
 
-3. Start the development server:
-   ```bash
+3. Run the development server:
+   ```
    npm start
    ```
+   The frontend will run on http://localhost:3000
 
-The frontend will start on `http://localhost:3000`
+## Usage Guide
 
-## API Endpoints
+### Getting Started
 
-### Authentication
+1. **Set up accounts**: Create your bank accounts, credit cards, and other financial accounts
+2. **Add categories**: Set up your budget categories and subcategories
+3. **Create a budget**: Allocate funds to your categories
+4. **Add transactions**: Record your income and expenses
 
-- POST `/api/auth/register` - Register new user
-- POST `/api/auth/login` - User login
-- POST `/api/auth/logout` - User logout
-- GET `/api/auth/me` - Get current user
+### Budgeting (YNAB Style)
 
-### Accounts
+The application follows the YNAB (You Need A Budget) methodology:
 
-- GET `/api/accounts` - Get user accounts
-- POST `/api/accounts` - Create new account
-- PUT `/api/accounts/{id}` - Update account
-- DELETE `/api/accounts/{id}` - Delete account
+1. **Give Every Dollar a Job**: Allocate all your available money to specific categories
+2. **Embrace Your True Expenses**: Plan for larger, less frequent expenses by setting aside money each month
+3. **Roll With The Punches**: Move money between categories as your priorities change
+4. **Age Your Money**: Work towards spending money that's at least 30 days old
 
-### Transactions
+### Scheduled Transactions
 
-- GET `/api/transactions` - Get user transactions
-- POST `/api/transactions` - Create new transaction
-- PUT `/api/transactions/{id}` - Update transaction
-- DELETE `/api/transactions/{id}` - Delete transaction
+Set up recurring transactions for:
 
-## Database Schema
+- Regular bills (rent, utilities, subscriptions)
+- Income (salary, dividends)
+- Savings contributions
+- Loan payments
 
-### Users
+### Analytics
 
-- id (PK)
-- email
-- password (hashed)
-- first_name
-- last_name
-- created_at
-- updated_at
+Gain insights into your financial habits with:
 
-### Accounts
+- Spending by category
+- Income vs. expenses over time
+- Net worth tracking
+- Budget compliance
 
-- id (PK)
-- user_id (FK)
-- name
-- type
-- balance
-- currency
-- created_at
-- updated_at
+## Troubleshooting
 
-### Transactions
+### Common Issues
 
-- id (PK)
-- account_id (FK)
-- amount
-- type
-- description
-- category
-- date
-- merchant_name
-- reference_number
-- recurring
-- notes
-- created_at
-- updated_at
+- **Backend connection errors**: Ensure the backend server is running on port 5002
+- **Database errors**: Check file permissions for the SQLite database
+- **CORS issues**: Verify that the frontend is connecting to the correct backend URL
 
-## Security Features
+### Logs
 
-- Session-based authentication
-- CSRF protection
-- Secure password hashing
-- Protected API endpoints
-- Input validation
-- Error handling
-
-## Development Guidelines
-
-1. Follow Git flow for branch management
-2. Write unit tests for new features
-3. Follow code style guidelines
-4. Document new features and APIs
-5. Keep the README updated
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+- Backend logs are available in the terminal where the server is running
+- Frontend logs can be viewed in the browser's developer console
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Inspired by YNAB (You Need A Budget) and other personal finance tools
+- Built with open-source technologies

@@ -1,0 +1,39 @@
+{
+  "appId": "com.personal-finance.app",
+  "productName": "Personal Finance Manager",
+  "directories": {
+    "output": "dist"
+  },
+  "files": ["build/**/*", "main.js", "node_modules/**/*"],
+  "extraResources": [
+    {
+      "from": "../backend",
+      "to": "backend",
+      "filter": ["**/*", "!**/__pycache__/*", "!**/*.pyc"]
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.finance",
+    "target": ["dmg"],
+    "icon": "build/icons/icon.icns",
+    "darkModeSupport": true
+  },
+  "dmg": {
+    "background": "build/background.png",
+    "icon": "build/icons/icon.icns",
+    "iconSize": 100,
+    "contents": [
+      {
+        "x": 380,
+        "y": 280,
+        "type": "link",
+        "path": "/Applications"
+      },
+      {
+        "x": 110,
+        "y": 280,
+        "type": "file"
+      }
+    ]
+  }
+}

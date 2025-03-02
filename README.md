@@ -12,12 +12,71 @@ A comprehensive personal finance application with YNAB-style envelope budgeting,
 - **Categories Management**: Create and organize categories and subcategories for your transactions
 - **Analytics**: Visualize your spending patterns, income sources, and financial trends
 - **Data Import**: Import transaction data from CSV files
+- **Balance Projections**: See how your account balances might change over time
+- **Budget Progress Tracking**: Monitor your spending against your budget in real-time
 
 ## Tech Stack
 
-- **Frontend**: React, Material-UI, Chart.js
-- **Backend**: Flask (Python)
-- **Database**: SQLite (easily upgradable to PostgreSQL or MySQL)
+### Frontend
+
+- **Framework**: React 18
+- **UI Library**: Material-UI v5 with emotion styling
+- **State Management**: React Hooks
+- **Routing**: React Router v6
+- **HTTP Client**: Axios
+- **Charting**: Chart.js with react-chartjs-2
+- **Date Handling**: date-fns
+- **Data Grid**: MUI X Data Grid for tabular data
+- **Color Picker**: react-colorful for budget category customization
+
+### Backend
+
+- **Framework**: Flask (Python)
+- **ORM**: SQLAlchemy
+- **Data Processing**: Pandas, NumPy
+- **Data Visualization**: Matplotlib, Seaborn, Plotly
+- **Testing**: PyTest, Coverage
+- **Validation**: Pydantic
+- **Code Quality**: Black, Flake8
+
+### Database
+
+- **Primary**: SQLite (easily upgradable to PostgreSQL or MySQL)
+- **MongoDB Support**: Available via pymongo for specific use cases
+
+## Project Structure
+
+```
+personal-finance/
+├── backend/               # Flask backend
+│   ├── data/              # Database and data files
+│   ├── src/               # Source code
+│   │   ├── account_manager.py
+│   │   ├── analytics.py
+│   │   ├── app.py         # Main Flask application
+│   │   ├── budget_manager.py
+│   │   ├── category_manager.py
+│   │   ├── database.py
+│   │   ├── scheduled_transaction_manager.py
+│   │   └── transaction_manager.py
+│   ├── tests/             # Comprehensive test suite
+│   ├── run.py             # Entry point for backend
+│   ├── seed_data.py       # Initialize with sample data
+│   └── requirements.txt   # Python dependencies
+│
+├── frontend/              # React frontend
+│   ├── public/            # Static files
+│   ├── src/               # Source code
+│   │   ├── components/    # Reusable UI components
+│   │   ├── pages/         # Application pages
+│   │   ├── services/      # API and utility services
+│   │   ├── assets/        # Images and other assets
+│   │   ├── App.js         # Main React component
+│   │   └── theme.js       # Material UI theme configuration
+│   ├── package.json       # Node.js dependencies
+│   └── main.js            # Electron support
+└── .gitignore             # Git ignore file
+```
 
 ## Setup Instructions
 
@@ -74,6 +133,36 @@ A comprehensive personal finance application with YNAB-style envelope budgeting,
    ```
    The frontend will run on http://localhost:3000
 
+## API Endpoints
+
+The backend provides a comprehensive RESTful API:
+
+- **/api/accounts** - Manage financial accounts
+- **/api/transactions** - Handle financial transactions
+- **/api/budgets** - Configure and monitor budgets
+- **/api/categories** - Organize transaction categories
+- **/api/scheduled-transactions** - Set up recurring transactions
+- **/api/analytics** - Get financial insights and visualizations
+- **/api/import-csv** - Import transaction data
+
+## Testing
+
+### Backend Tests
+
+Run the comprehensive test suite:
+
+```
+cd backend
+pytest
+```
+
+Generate coverage report:
+
+```
+cd backend
+python run_tests.py
+```
+
 ## Usage Guide
 
 ### Getting Started
@@ -109,6 +198,8 @@ Gain insights into your financial habits with:
 - Income vs. expenses over time
 - Net worth tracking
 - Budget compliance
+- Balance projections
+- Category breakdown
 
 ## Troubleshooting
 

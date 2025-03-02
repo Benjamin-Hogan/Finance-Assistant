@@ -6,6 +6,9 @@ omit =
     */.venv/*
     */venv/*
     */env/*
+    */htmlcov/*
+    */data/*
+    */frontend/*
 
 [report]
 exclude_lines =

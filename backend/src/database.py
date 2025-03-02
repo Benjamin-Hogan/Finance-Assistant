@@ -10,125 +10,159 @@ class Database:
     def __init__(self, db_path=None):
         """Initialize database connection"""
         if db_path is None:
-            # Create data directory if it doesn't exist
-            data_dir = os.path.join(os.path.dirname(
-                os.path.dirname(__file__)), 'data')
-            os.makedirs(data_dir, exist_ok=True)
-            db_path = os.path.join(data_dir, 'finance.db')
+            # Check if we're running in test mode
+            test_db_path = os.environ.get("TEST_DB_PATH")
+            test_db_dir = os.environ.get("TEST_DB_DIR")
+
+            if test_db_path:
+                # Use the specific test database path
+                db_path = test_db_path
+                print(f"Using test database from TEST_DB_PATH: {db_path}")
+            elif test_db_dir:
+                # We're in test mode, use test database directory
+                os.makedirs(test_db_dir, exist_ok=True)
+                db_path = os.path.join(test_db_dir, 'test_finance.db')
+                print(f"Using test database from TEST_DB_DIR: {db_path}")
+            else:
+                # Normal mode, use regular data directory
+                data_dir = os.path.join(os.path.dirname(
+                    os.path.dirname(__file__)), 'data')
+                os.makedirs(data_dir, exist_ok=True)
+                db_path = os.path.join(data_dir, 'finance.db')
 
         self.db_path = db_path
         self.conn = None
         self.initialize_db()
+        print(f"Database initialized at: {self.db_path}")
 
     def get_connection(self):
         """Get a database connection with thread safety"""
         if self.conn is None:
-            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            self.conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+            try:
+                # Ensure the directory exists
+                db_dir = os.path.dirname(self.db_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir, exist_ok=True)
+
+                self.conn = sqlite3.connect(
+                    self.db_path, check_same_thread=False)
+                self.conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+            except sqlite3.Error as e:
+                print(f"Database connection error: {e}")
+                raise
         return self.conn
 
     def initialize_db(self):
         """Initialize the database with required tables"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
 
-        # Create accounts table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS accounts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            balance REAL NOT NULL DEFAULT 0,
-            currency TEXT DEFAULT 'USD',
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
+            # Create accounts table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                balance REAL NOT NULL DEFAULT 0,
+                currency TEXT DEFAULT 'USD',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
 
-        # Create transactions table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            account_id INTEGER NOT NULL,
-            date TEXT NOT NULL,
-            amount REAL NOT NULL,
-            description TEXT NOT NULL,
-            category TEXT,
-            subcategory TEXT,
-            is_income BOOLEAN DEFAULT 0,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (account_id) REFERENCES accounts (id)
-        )
-        ''')
+            # Create transactions table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                amount REAL NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT,
+                subcategory TEXT,
+                is_income BOOLEAN DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (account_id) REFERENCES accounts (id)
+            )
+            ''')
 
-        # Create scheduled transactions table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS scheduled_transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            account_id INTEGER NOT NULL,
-            description TEXT NOT NULL,
-            amount REAL NOT NULL,
-            frequency TEXT NOT NULL,
-            start_date TEXT NOT NULL,
-            end_date TEXT,
-            day_of_month INTEGER,
-            day_of_week INTEGER,
-            category TEXT,
-            subcategory TEXT,
-            is_income BOOLEAN DEFAULT 0,
-            last_occurrence TEXT,
-            next_occurrence TEXT,
-            active BOOLEAN DEFAULT 1,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (account_id) REFERENCES accounts (id)
-        )
-        ''')
+            # Create scheduled transactions table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scheduled_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                description TEXT NOT NULL,
+                amount REAL NOT NULL,
+                frequency TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                day_of_month INTEGER,
+                day_of_week INTEGER,
+                category TEXT,
+                subcategory TEXT,
+                is_income BOOLEAN DEFAULT 0,
+                last_occurrence TEXT,
+                next_occurrence TEXT,
+                active BOOLEAN DEFAULT 1,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (account_id) REFERENCES accounts (id)
+            )
+            ''')
 
-        # Create budgets table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS budgets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,
-            subcategory TEXT,
-            amount REAL NOT NULL,
-            period TEXT DEFAULT 'monthly',
-            start_date TEXT,
-            end_date TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
+            # Create budgets table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS budgets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                subcategory TEXT,
+                amount REAL NOT NULL,
+                period TEXT DEFAULT 'monthly',
+                start_date TEXT,
+                end_date TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
 
-        # Create categories table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            color TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
+            # Create categories table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                color TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
 
-        # Create subcategories table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS subcategories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            color TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (category_id) REFERENCES categories (id)
-        )
-        ''')
+            # Create subcategories table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS subcategories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (category_id) REFERENCES categories (id),
+                UNIQUE(category_id, name)
+            )
+            ''')
 
-        conn.commit()
+            # Commit the table creation
+            conn.commit()
+
+            print(
+                f"Successfully initialized database tables at {self.db_path}")
+
+        except Exception as e:
+            print(f"Error initializing database: {e}")
+            raise
 
     def execute_query(self, query, params=None):
         """Execute a query and return results"""

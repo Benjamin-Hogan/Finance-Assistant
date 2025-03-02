@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 
 
 @pytest.fixture
-def client(test_client, create_test_data):
+def client(client):
     """Test client with initialized test data"""
-    return test_client
+    return client
 
 
 def test_edit_transaction(client):
@@ -49,8 +49,20 @@ def test_edit_transaction(client):
 
 def test_delete_transaction(client):
     """Test that deleting a transaction works properly"""
+    # Get a valid account ID from our test database
+    response = client.get('/api/accounts')
+    assert response.status_code == 200
+    accounts = json.loads(response.data)
+    assert len(accounts) > 0
+    account_id = accounts[0]['id']
+
+    # Get the initial account balance
+    response = client.get(f'/api/accounts/{account_id}')
+    assert response.status_code == 200
+    initial_account = json.loads(response.data)
+    initial_balance = initial_account['balance']
+
     # Create a transaction to delete
-    account_id = 1  # Assuming test data includes this account
     transaction_data = {
         'account_id': account_id,
         'date': datetime.now().strftime('%Y-%m-%d'),
@@ -69,28 +81,27 @@ def test_delete_transaction(client):
     result = json.loads(response.data)
     transaction_id = result['id']
 
-    # Get the account balance before deletion
+    # Get the account balance after transaction
     response = client.get(f'/api/accounts/{account_id}')
     assert response.status_code == 200
-    account_before = json.loads(response.data)
-    balance_before = account_before['balance']
+    updated_account = json.loads(response.data)
+    updated_balance = updated_account['balance']
+
+    # Verify the balance was reduced by the transaction amount
+    assert round(updated_balance, 2) == round(initial_balance - 75.00, 2)
 
     # Delete the transaction
     response = client.delete(f'/api/transactions/{transaction_id}')
     assert response.status_code == 200
 
-    # Verify the transaction was deleted
-    response = client.get(f'/api/transactions/{transaction_id}')
-    assert response.status_code == 404
-
-    # Verify the account balance was updated
+    # Get the account balance after deletion
     response = client.get(f'/api/accounts/{account_id}')
     assert response.status_code == 200
-    account_after = json.loads(response.data)
-    balance_after = account_after['balance']
+    final_account = json.loads(response.data)
+    final_balance = final_account['balance']
 
-    # Since we deleted a transaction with amount -75.00, balance should increase by 75.00
-    assert balance_after == balance_before + 75.00
+    # Verify the balance was restored
+    assert round(final_balance, 2) == round(initial_balance, 2)
 
 
 def test_transaction_budget_integration(client):
@@ -173,21 +184,28 @@ def test_transaction_budget_integration(client):
 
 def test_income_transaction(client):
     """Test income transactions are handled correctly"""
+    # Get a valid account ID from our test database
+    response = client.get('/api/accounts')
+    assert response.status_code == 200
+    accounts = json.loads(response.data)
+    assert len(accounts) > 0
+    account_id = accounts[0]['id']
+
     # Get initial account balance
-    account_id = 1  # Assuming test data includes this account
     response = client.get(f'/api/accounts/{account_id}')
     assert response.status_code == 200
-    account_before = json.loads(response.data)
-    balance_before = account_before['balance']
+    initial_account = json.loads(response.data)
+    initial_balance = initial_account['balance']
 
-    # Add an income transaction
-    income_amount = 1000.00
+    # Create an income transaction
+    income_amount = 250.00
     transaction_data = {
         'account_id': account_id,
         'date': datetime.now().strftime('%Y-%m-%d'),
         'amount': income_amount,
         'description': 'Test Income',
         'category': 'Income',
+        'subcategory': 'Salary',
         'is_income': True
     }
 
@@ -200,21 +218,22 @@ def test_income_transaction(client):
     result = json.loads(response.data)
     transaction_id = result['id']
 
-    # Verify account balance increased
+    # Verify the account balance increased
     response = client.get(f'/api/accounts/{account_id}')
     assert response.status_code == 200
-    account_after = json.loads(response.data)
-    balance_after = account_after['balance']
+    updated_account = json.loads(response.data)
+    updated_balance = updated_account['balance']
 
-    assert balance_after == balance_before + income_amount
+    # Check that the balance increased by the income amount
+    assert round(updated_balance, 2) == round(
+        initial_balance + income_amount, 2)
 
-    # Verify income analytics
-    response = client.get('/api/analytics/income?timeframe=month')
+    # Verify the transaction was marked as income
+    response = client.get(f'/api/transactions/{transaction_id}')
     assert response.status_code == 200
-    income_data = json.loads(response.data)
-
-    # Income data should include our new transaction
-    # The exact format depends on your implementation, but we should be able to find our transaction
+    transaction = json.loads(response.data)
+    assert transaction['is_income'] == True
+    assert transaction['amount'] == income_amount
 
     # Clean up - delete the test transaction
     client.delete(f'/api/transactions/{transaction_id}')

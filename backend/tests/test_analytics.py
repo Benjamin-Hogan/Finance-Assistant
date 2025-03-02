@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 
 
 @pytest.fixture
-def client(test_client, create_test_data):
+def client(client):
     """Test client with initialized test data"""
-    return test_client
+    return client
 
 
 def test_spending_by_category(client):
@@ -28,14 +28,23 @@ def test_spending_by_category(client):
     today = datetime.now()
     transactions = []
 
-    for i, category in enumerate(categories[:3]):  # Use first 3 categories
+    # Use categories that we know exist in our test data
+    test_categories = ['Food', 'Entertainment', 'Transportation']
+
+    for i, category_name in enumerate(test_categories):
         amount = -(i + 1) * 100  # -100, -200, -300
+
+        # Find the category object for this name
+        category = next(
+            (c for c in categories if c['name'] == category_name), None)
+        assert category is not None, f"Category {category_name} not found in test data"
+
         tx_data = {
             'account_id': account_id,
             'date': today.strftime('%Y-%m-%d'),
             'amount': amount,
-            'description': f'Test Analytics for {category["name"]}',
-            'category': category['name'],
+            'description': f'Test Analytics for {category_name}',
+            'category': category_name,
             'is_income': False
         }
 
@@ -48,7 +57,7 @@ def test_spending_by_category(client):
         result = json.loads(response.data)
         transactions.append({
             'id': result['id'],
-            'category': category['name'],
+            'category': category_name,
             'amount': amount
         })
 
@@ -485,12 +494,12 @@ def test_category_breakdown(client):
     transactions = []
     today = datetime.now()
 
-    # Use the first category with subcategories
-    test_category = None
-    for category in categories:
-        if 'subcategories' in category and len(category['subcategories']) > 0:
-            test_category = category
-            break
+    # Use a specific category and subcategories that we know exist
+    test_category = next((c for c in categories if c['name'] == 'Entertainment' and 'subcategories' in c and len(
+        c['subcategories']) > 0), None)
+    if test_category is None:
+        test_category = next((c for c in categories if 'subcategories' in c and len(
+            c['subcategories']) > 0), None)
 
     assert test_category is not None, "No category with subcategories found"
 
@@ -517,22 +526,24 @@ def test_category_breakdown(client):
         transactions.append(result['id'])
 
     # Get category breakdown
-    response = client.get('/api/analytics/category-breakdown?timeframe=month')
-    if response.status_code == 200:
-        breakdown_data = json.loads(response.data)
+    response = client.get(
+        f'/api/analytics/category-breakdown?timeframe=month&category={test_category["name"]}')
+    assert response.status_code == 200
+    breakdown_data = json.loads(response.data)
 
-        # Check that we got data
-        if isinstance(breakdown_data, list):
-            assert len(breakdown_data) > 0
+    # Check that we got data
+    assert breakdown_data is not None
+    if isinstance(breakdown_data, list):
+        assert len(breakdown_data) > 0
 
-            # Verify our test category and subcategories are in the results
-            category_found = False
-            for item in breakdown_data:
-                if item.get('category') == test_category['name']:
-                    category_found = True
-                    break
+        # Verify our test category and subcategories are in the results
+        category_found = False
+        for item in breakdown_data:
+            if item.get('category') == test_category['name']:
+                category_found = True
+                break
 
-            assert category_found, f"Category {test_category['name']} not found in breakdown"
+        assert category_found, f"Category {test_category['name']} not found in breakdown"
 
     # Clean up
     for tx_id in transactions:

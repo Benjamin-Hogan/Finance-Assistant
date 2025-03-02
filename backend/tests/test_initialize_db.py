@@ -22,6 +22,8 @@ def create_test_database(db_path):
     conn.commit()
     conn.close()
 
+    print(f"Test database created successfully at {db_path}")
+
 
 def create_tables(cursor):
     """Create all the tables needed for testing"""
@@ -101,7 +103,7 @@ def create_tables(cursor):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
+        name TEXT NOT NULL UNIQUE,
         color TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -114,10 +116,10 @@ def create_tables(cursor):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         category_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        color TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (category_id) REFERENCES categories (id)
+        FOREIGN KEY (category_id) REFERENCES categories (id),
+        UNIQUE(category_id, name)
     )
     ''')
 
@@ -136,18 +138,18 @@ def insert_test_data(cursor):
     food_id = cursor.lastrowid
 
     # Insert test subcategories
-    cursor.execute("INSERT INTO subcategories (category_id, name, color) VALUES (?, ?, ?)",
-                   (income_id, "Salary", None))
+    cursor.execute("INSERT INTO subcategories (category_id, name) VALUES (?, ?)",
+                   (income_id, "Salary"))
     cursor.execute(
-        "INSERT INTO subcategories (category_id, name, color) VALUES (?, ?, ?)", (income_id, "Bonus", None))
+        "INSERT INTO subcategories (category_id, name) VALUES (?, ?)", (income_id, "Bonus"))
     cursor.execute(
-        "INSERT INTO subcategories (category_id, name, color) VALUES (?, ?, ?)", (housing_id, "Rent", None))
-    cursor.execute("INSERT INTO subcategories (category_id, name, color) VALUES (?, ?, ?)",
-                   (housing_id, "Utilities", None))
-    cursor.execute("INSERT INTO subcategories (category_id, name, color) VALUES (?, ?, ?)",
-                   (food_id, "Groceries", None))
-    cursor.execute("INSERT INTO subcategories (category_id, name, color) VALUES (?, ?, ?)",
-                   (food_id, "Dining Out", None))
+        "INSERT INTO subcategories (category_id, name) VALUES (?, ?)", (housing_id, "Rent"))
+    cursor.execute("INSERT INTO subcategories (category_id, name) VALUES (?, ?)",
+                   (housing_id, "Utilities"))
+    cursor.execute("INSERT INTO subcategories (category_id, name) VALUES (?, ?)",
+                   (food_id, "Groceries"))
+    cursor.execute("INSERT INTO subcategories (category_id, name) VALUES (?, ?)",
+                   (food_id, "Dining Out"))
 
     # Insert test accounts
     cursor.execute("INSERT INTO accounts (name, type, balance, currency) VALUES (?, ?, ?, ?)",
@@ -214,8 +216,6 @@ if __name__ == "__main__":
 
     # Create the test database
     create_test_database(db_path)
-
-    print(f"Test database created at: {db_path}")
 
     # Clean up when done
     shutil.rmtree(temp_dir)

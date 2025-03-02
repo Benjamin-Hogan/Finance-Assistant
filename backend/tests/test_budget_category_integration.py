@@ -369,10 +369,10 @@ def test_subcategory_budgeting(client):
 
 
 def test_budget_period_handling(client):
-    """Test different budget periods (monthly, yearly, etc.)"""
-    # Create a category for testing
+    """Test different budget periods (monthly, yearly, weekly)"""
+    # Create a unique category for testing to avoid interference from existing data
     category_data = {
-        'name': 'Period Test Category',
+        'name': f'Period Test Category {datetime.now().timestamp()}',
         'color': '#3F51B5',
         'subcategories': []
     }
@@ -417,8 +417,14 @@ def test_budget_period_handling(client):
         result = json.loads(response.data)
         budget_ids.append(result['id'])
 
+    # Get a valid account for testing
+    response = client.get('/api/accounts')
+    assert response.status_code == 200
+    accounts = json.loads(response.data)
+    assert len(accounts) > 0
+    account_id = accounts[0]['id']
+
     # Add a transaction in this category
-    account_id = 1  # Assuming test data includes this account
     transaction_data = {
         'account_id': account_id,
         'date': datetime.now().strftime('%Y-%m-%d'),
@@ -441,10 +447,11 @@ def test_budget_period_handling(client):
     for period in ['monthly', 'yearly', 'weekly']:
         response = client.get(
             f'/api/budgets/progress?category={category_name}&period={period}')
-        if response.status_code == 200:
-            progress = json.loads(response.data)
-            spent = progress.get('spent', 0)
-            assert round(spent, 2) == 50.00
+        assert response.status_code == 200
+        progress = json.loads(response.data)
+        spent = progress.get('spent', 0)
+        assert round(
+            spent, 2) == 50.00, f"Expected spending of 50.00 but got {spent} for period {period}"
 
     # Clean up
     client.delete(f'/api/transactions/{transaction_id}')

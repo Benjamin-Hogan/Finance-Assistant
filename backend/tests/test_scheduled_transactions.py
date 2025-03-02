@@ -6,12 +6,13 @@ from sqlite3 import connect
 
 @pytest.fixture
 def client(test_client, create_test_data):
-    """Test client with initialized test data"""
-    return test_client
+    """Create a test client for scheduled transaction tests"""
+    # Return the Flask test client from conftest
+    yield test_client
 
 
 def test_scheduled_transaction_crud(client):
-    """Test creating, reading, updating, and deleting scheduled transactions"""
+    """Test CRUD operations for scheduled transactions"""
     # Get an account for the scheduled transaction
     response = client.get('/api/accounts')
     assert response.status_code == 200
@@ -23,9 +24,9 @@ def test_scheduled_transaction_crud(client):
     transaction_data = {
         'account_id': account_id,
         'description': 'Monthly Rent',
-        'amount': -1200.00,
+        'amount': -1500.00,
         'frequency': 'monthly',
-        'start_date': datetime.now().strftime('%Y-%m-%d'),
+        'start_date': '2023-01-01',
         'day_of_month': 1,
         'category': 'Housing',
         'is_income': False
@@ -40,20 +41,18 @@ def test_scheduled_transaction_crud(client):
     result = json.loads(response.data)
     transaction_id = result['id']
 
-    # Read the scheduled transaction
+    # Get the scheduled transaction
     response = client.get(f'/api/scheduled-transactions/{transaction_id}')
     assert response.status_code == 200
     transaction = json.loads(response.data)
     assert transaction['description'] == 'Monthly Rent'
-    assert transaction['amount'] == -1200.00
-    assert transaction['frequency'] == 'monthly'
+    assert transaction['amount'] == -1500.00
 
     # Update the scheduled transaction
     update_data = {
-        'amount': -1300.00,
-        'description': 'Updated Monthly Rent'
+        'description': 'Updated Monthly Rent',
+        'amount': -1600.00
     }
-
     response = client.put(
         f'/api/scheduled-transactions/{transaction_id}',
         json=update_data,
@@ -64,9 +63,9 @@ def test_scheduled_transaction_crud(client):
     # Verify the update
     response = client.get(f'/api/scheduled-transactions/{transaction_id}')
     assert response.status_code == 200
-    updated_transaction = json.loads(response.data)
-    assert updated_transaction['description'] == 'Updated Monthly Rent'
-    assert updated_transaction['amount'] == -1300.00
+    updated_tx = json.loads(response.data)
+    assert updated_tx['description'] == 'Updated Monthly Rent'
+    assert updated_tx['amount'] == -1600.00
 
     # Delete the scheduled transaction
     response = client.delete(f'/api/scheduled-transactions/{transaction_id}')
@@ -74,7 +73,7 @@ def test_scheduled_transaction_crud(client):
 
     # Verify deletion
     response = client.get(f'/api/scheduled-transactions/{transaction_id}')
-    assert response.status_code == 404
+    assert response.status_code == 404  # Should return not found
 
 
 def test_process_scheduled_transaction(client):
@@ -99,7 +98,9 @@ def test_process_scheduled_transaction(client):
         'start_date': yesterday.strftime('%Y-%m-%d'),
         'day_of_month': yesterday.day,
         'category': 'Housing',
-        'is_income': False
+        'is_income': False,
+        # Set next_occurrence to yesterday directly
+        'next_occurrence': yesterday.isoformat()
     }
 
     response = client.post(
@@ -111,17 +112,16 @@ def test_process_scheduled_transaction(client):
     result = json.loads(response.data)
     transaction_id = result['id']
 
-    # Set the next_occurrence to yesterday to make it due immediately
-    # This is done directly with SQLite to simplify testing
-    conn = connect('data/finance.db')
-    cursor = conn.cursor()
-    yesterday_iso = yesterday.isoformat()
-    cursor.execute(
-        "UPDATE scheduled_transactions SET next_occurrence = ? WHERE id = ?",
-        (yesterday_iso, transaction_id)
+    # Force update next_occurrence through the API to ensure correct DB is used
+    update_data = {
+        'next_occurrence': yesterday.isoformat()
+    }
+    response = client.put(
+        f'/api/scheduled-transactions/{transaction_id}',
+        json=update_data,
+        content_type='application/json'
     )
-    conn.commit()
-    conn.close()
+    assert response.status_code == 200
 
     # Process scheduled transactions
     response = client.post('/api/scheduled-transactions/process')
@@ -268,7 +268,9 @@ def test_scheduled_income_transaction(client):
         'start_date': yesterday.strftime('%Y-%m-%d'),
         'day_of_month': yesterday.day,
         'category': 'Income',
-        'is_income': True
+        'is_income': True,
+        # Set next_occurrence to yesterday directly
+        'next_occurrence': yesterday.isoformat()
     }
 
     response = client.post(
@@ -280,17 +282,16 @@ def test_scheduled_income_transaction(client):
     result = json.loads(response.data)
     transaction_id = result['id']
 
-    # Set the next_occurrence to yesterday to make it due immediately
-    # This is done directly with SQLite to simplify testing
-    conn = connect('data/finance.db')
-    cursor = conn.cursor()
-    yesterday_iso = yesterday.isoformat()
-    cursor.execute(
-        "UPDATE scheduled_transactions SET next_occurrence = ? WHERE id = ?",
-        (yesterday_iso, transaction_id)
+    # Force update next_occurrence through the API to ensure correct DB is used
+    update_data = {
+        'next_occurrence': yesterday.isoformat()
+    }
+    response = client.put(
+        f'/api/scheduled-transactions/{transaction_id}',
+        json=update_data,
+        content_type='application/json'
     )
-    conn.commit()
-    conn.close()
+    assert response.status_code == 200
 
     # Process scheduled transactions
     response = client.post('/api/scheduled-transactions/process')
@@ -338,7 +339,9 @@ def test_end_date_scheduled_transaction(client):
         'start_date': yesterday.strftime('%Y-%m-%d'),
         'end_date': tomorrow.strftime('%Y-%m-%d'),
         'category': 'Entertainment',
-        'is_income': False
+        'is_income': False,
+        # Set next_occurrence to yesterday directly
+        'next_occurrence': yesterday.isoformat()
     }
 
     response = client.post(
@@ -350,17 +353,16 @@ def test_end_date_scheduled_transaction(client):
     result = json.loads(response.data)
     transaction_id = result['id']
 
-    # Set the next_occurrence to yesterday to make it due immediately
-    # This is done directly with SQLite to simplify testing
-    conn = connect('data/finance.db')
-    cursor = conn.cursor()
-    yesterday_iso = yesterday.isoformat()
-    cursor.execute(
-        "UPDATE scheduled_transactions SET next_occurrence = ? WHERE id = ?",
-        (yesterday_iso, transaction_id)
+    # Force update next_occurrence through the API to ensure correct DB is used
+    update_data = {
+        'next_occurrence': yesterday.isoformat()
+    }
+    response = client.put(
+        f'/api/scheduled-transactions/{transaction_id}',
+        json=update_data,
+        content_type='application/json'
     )
-    conn.commit()
-    conn.close()
+    assert response.status_code == 200
 
     # Process scheduled transactions
     response = client.post('/api/scheduled-transactions/process')

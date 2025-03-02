@@ -7,6 +7,7 @@ import sys
 import tempfile
 import shutil
 from datetime import datetime, timedelta
+import time
 
 # Add the backend directory to the path
 sys.path.insert(0, os.path.abspath(
@@ -23,11 +24,47 @@ class ApiEndpointTestCase(unittest.TestCase):
         # Configure the app for testing
         app.config['TESTING'] = True
         app.config['DEBUG'] = False
-        self.app = app.test_client()
 
         # Create a test database
         self.test_db = Database(self.db_path)
-        db = self.test_db  # Replace the global db with our test db
+
+        # Update the app's database connection through its module
+        import src.app
+        # Store the original db reference to restore later
+        if hasattr(src.app, 'db'):
+            self.original_db = src.app.db
+            # Replace the app's database with our test database
+            src.app.db = self.test_db
+
+            # Update all managers to use the test database
+            if hasattr(src.app, 'account_manager'):
+                from src.account_manager import AccountManager
+                src.app.account_manager = AccountManager(self.test_db)
+
+            if hasattr(src.app, 'transaction_manager'):
+                from src.transaction_manager import TransactionManager
+                src.app.transaction_manager = TransactionManager(self.test_db)
+
+            if hasattr(src.app, 'budget_manager'):
+                from src.budget_manager import BudgetManager
+                src.app.budget_manager = BudgetManager(self.test_db)
+
+            if hasattr(src.app, 'analytics'):
+                from src.analytics import Analytics
+                src.app.analytics = Analytics(self.test_db)
+
+            if hasattr(src.app, 'scheduled_transaction_manager'):
+                from src.scheduled_transaction_manager import ScheduledTransactionManager
+                src.app.scheduled_transaction_manager = ScheduledTransactionManager(
+                    self.test_db)
+
+            if hasattr(src.app, 'category_manager'):
+                from src.category_manager import CategoryManager
+                src.app.category_manager = CategoryManager(
+                    self.test_db, initialize_defaults=False)
+
+        # Get the test client
+        self.app = app.test_client()
 
         # Populate the database with test data
         self._create_test_data()
@@ -36,6 +73,11 @@ class ApiEndpointTestCase(unittest.TestCase):
         """Tear down test fixtures after each test method"""
         # Close the test database connection
         self.test_db.close()
+
+        # Restore the original database connection if it was saved
+        if hasattr(self, 'original_db'):
+            import src.app
+            src.app.db = self.original_db
 
         # Remove the temporary directory
         shutil.rmtree(self.temp_dir)
@@ -265,10 +307,15 @@ class ApiEndpointTestCase(unittest.TestCase):
             'color': '#9C27B0',
             'subcategories': ['Test Sub 1', 'Test Sub 2', 'Test Sub 3']
         }
+
+        # Post to the API to create the category
         response = self.app.post('/api/categories',
                                  json=category_data,
                                  content_type='application/json')
         self.assertEqual(response.status_code, 200)
+
+        # Wait a moment for database operations to complete
+        time.sleep(0.1)
 
         # Verify the category was added
         response = self.app.get('/api/categories')

@@ -2,11 +2,16 @@ import random
 
 
 class CategoryManager:
-    def __init__(self, db):
+    def __init__(self, db, initialize_defaults=True):
         """Initialize category manager with database connection"""
         self.db = db
-        # Initialize default categories when created
-        self.initialize_default_categories()
+        # Initialize default categories when created, if requested
+        if initialize_defaults:
+            try:
+                self.initialize_default_categories()
+            except Exception as e:
+                print(f"Warning: Error initializing default categories: {e}")
+                # Continue with initialization even if there's an error
 
     def initialize_default_categories(self):
         """Initialize default categories if they don't exist"""
@@ -122,8 +127,9 @@ class CategoryManager:
         # Get subcategories for each category
         for category in categories:
             subcategories_query = """
-            SELECT s.id, s.name, s.color
+            SELECT s.id, s.name, c.color
             FROM subcategories s
+            JOIN categories c ON s.category_id = c.id
             WHERE s.category_id = ?
             ORDER BY s.name
             """
@@ -147,8 +153,9 @@ class CategoryManager:
 
         # Get subcategories
         subcategories_query = """
-        SELECT s.id, s.name, s.color
+        SELECT s.id, s.name, c.color
         FROM subcategories s
+        JOIN categories c ON s.category_id = c.id
         WHERE s.category_id = ?
         ORDER BY s.name
         """
@@ -312,32 +319,35 @@ class CategoryManager:
 
         # Insert new subcategory
         insert_query = """
-        INSERT INTO subcategories (category_id, name, color)
-        VALUES (?, ?, ?)
+        INSERT INTO subcategories (category_id, name)
+        VALUES (?, ?)
         """
         params = (
             subcategory_data['category_id'],
-            subcategory_data['name'],
-            subcategory_data.get('color')
+            subcategory_data['name']
         )
 
         subcategory_id = self.db.execute_insert(insert_query, params)
 
         # Get the created subcategory
         query = """
-        SELECT s.id, s.name, s.color
+        SELECT s.id, s.name, c.color 
         FROM subcategories s
+        JOIN categories c ON s.category_id = c.id
         WHERE s.id = ?
         """
         subcategory = self.db.execute_query(query, (subcategory_id,))
 
-        return subcategory[0] if subcategory else None
+        if not subcategory:
+            return {'error': 'Failed to retrieve created subcategory'}
+
+        return subcategory[0]
 
     def update_subcategory(self, subcategory_id, subcategory_data):
         """Update an existing subcategory"""
         # Check if subcategory exists
         query = """
-        SELECT s.id, s.name, s.color, s.category_id
+        SELECT s.id, s.name, s.category_id
         FROM subcategories s
         WHERE s.id = ?
         """
@@ -351,12 +361,11 @@ class CategoryManager:
         # Update subcategory
         update_query = """
         UPDATE subcategories
-        SET name = ?, color = ?, category_id = ?
+        SET name = ?, category_id = ?
         WHERE id = ?
         """
         params = (
             subcategory_data.get('name', subcategory['name']),
-            subcategory_data.get('color', subcategory['color']),
             subcategory_data.get('category_id', subcategory['category_id']),
             subcategory_id
         )
@@ -365,8 +374,9 @@ class CategoryManager:
 
         # Get the updated subcategory
         query = """
-        SELECT s.id, s.name, s.color
+        SELECT s.id, s.name, c.color
         FROM subcategories s
+        JOIN categories c ON s.category_id = c.id
         WHERE s.id = ?
         """
         updated_subcategory = self.db.execute_query(query, (subcategory_id,))
@@ -421,8 +431,12 @@ class CategoryManager:
         )
 
         if existing and len(existing) > 0:
-            # Category already exists, return the existing ID
-            return {'id': existing[0]['id'], 'message': 'Category already exists', 'name': category_data['name']}
+            # Category already exists, return the existing category with subcategories
+            category_id = existing[0]['id']
+            result = self.get_category_by_id(category_id)
+            # Add a message for compatibility with tests
+            result['message'] = 'Category already exists'
+            return result
 
         # Insert category
         category_id = self.db.execute_insert(
@@ -441,27 +455,26 @@ class CategoryManager:
         if 'subcategories' in category_data and isinstance(category_data['subcategories'], list):
             for subcategory in category_data['subcategories']:
                 if isinstance(subcategory, str):
-                    self.db.execute_insert(
-                        """
-                        INSERT INTO subcategories (category_id, name)
-                        VALUES (?, ?)
-                        """,
-                        (category_id, subcategory)
-                    )
+                    # For string subcategories, just use the name
+                    subcategory_data = {
+                        'category_id': category_id,
+                        'name': subcategory
+                    }
+                    self.create_subcategory(subcategory_data)
                 elif isinstance(subcategory, dict) and 'name' in subcategory:
-                    self.db.execute_insert(
-                        """
-                        INSERT INTO subcategories (category_id, name, color)
-                        VALUES (?, ?, ?)
-                        """,
-                        (
-                            category_id,
-                            subcategory['name'],
-                            subcategory.get('color')
-                        )
-                    )
+                    # For dict subcategories, use both name and color if available
+                    subcategory_data = {
+                        'category_id': category_id,
+                        'name': subcategory['name'],
+                        'color': subcategory.get('color')
+                    }
+                    self.create_subcategory(subcategory_data)
 
-        return {'id': category_id, 'message': 'Category created successfully', 'name': category_data['name']}
+        # Get the full category with subcategories
+        result = self.get_category_by_id(category_id)
+        # Add a message for compatibility with tests
+        result['message'] = 'Category created successfully'
+        return result
 
     def add_subcategory(self, category_id, subcategory_data):
         """Add a subcategory to a category - compatibility method for API"""

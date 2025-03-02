@@ -188,7 +188,7 @@ class ScheduledTransactionManager:
         now = datetime.now().isoformat()
 
         # Get all active scheduled transactions that are due
-        due_transactions = self.db.query(
+        due_transactions = self.db.execute_query(
             """
             SELECT * FROM scheduled_transactions
             WHERE active = 1 AND next_occurrence <= ?
@@ -232,7 +232,7 @@ class ScheduledTransactionManager:
                 active = 0
 
             # Update the scheduled transaction with the new next occurrence
-            self.db.execute(
+            self.db.execute_update(
                 """
                 UPDATE scheduled_transactions
                 SET last_occurrence = ?, next_occurrence = ?, active = ?

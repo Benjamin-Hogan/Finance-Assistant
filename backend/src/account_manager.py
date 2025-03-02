@@ -32,8 +32,8 @@ class AccountManager:
 
         # Insert account into database
         query = """
-        INSERT INTO accounts (name, type, balance, currency, institution, account_number, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO accounts (name, type, balance, currency, notes)
+        VALUES (?, ?, ?, ?, ?)
         """
         account_id = self.db.execute(
             query,
@@ -42,8 +42,6 @@ class AccountManager:
                 account_data['type'],
                 account_data.get('balance', 0.0),
                 account_data.get('currency', 'USD'),
-                account_data.get('institution'),
-                account_data.get('account_number'),
                 account_data.get('notes')
             )
         )
@@ -60,13 +58,13 @@ class AccountManager:
         fields = []
         params = []
 
-        for field in ['name', 'type', 'balance', 'currency', 'institution', 'account_number', 'notes']:
+        for field in ['name', 'type', 'balance', 'currency', 'notes']:
             if field in account_data:
                 fields.append(f"{field} = ?")
                 params.append(account_data[field])
 
-        # Add last_updated timestamp
-        fields.append("last_updated = ?")
+        # Add updated_at timestamp
+        fields.append("updated_at = ?")
         params.append(datetime.now().isoformat())
 
         # Add account_id to params
@@ -108,7 +106,7 @@ class AccountManager:
             return {'error': 'Account not found'}
 
         self.db.execute(
-            "UPDATE accounts SET balance = ?, last_updated = ? WHERE id = ?",
+            "UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?",
             (new_balance, datetime.now().isoformat(), account_id)
         )
 

@@ -70,6 +70,39 @@ class TransactionManager:
         except ValueError:
             return {'error': 'Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)'}
 
+        # Validate category if provided
+        if 'category' in transaction_data and transaction_data['category']:
+            # Check if the category exists
+            category_exists = self.db.execute_query(
+                """
+                SELECT COUNT(*) as count 
+                FROM categories 
+                WHERE name = ?
+                """,
+                (transaction_data['category'],)
+            )
+
+            if not category_exists or category_exists[0]['count'] == 0:
+                # Category doesn't exist - return error
+                return {'error': f'Category "{transaction_data["category"]}" does not exist. Please create it first.'}
+
+            # If subcategory is provided, validate it too
+            if 'subcategory' in transaction_data and transaction_data['subcategory']:
+                subcategory_exists = self.db.execute_query(
+                    """
+                    SELECT COUNT(*) as count 
+                    FROM subcategories s
+                    JOIN categories c ON s.category_id = c.id
+                    WHERE c.name = ? AND s.name = ?
+                    """,
+                    (transaction_data['category'],
+                     transaction_data['subcategory'])
+                )
+
+                if not subcategory_exists or subcategory_exists[0]['count'] == 0:
+                    # Subcategory doesn't exist - return error
+                    return {'error': f'Subcategory "{transaction_data["subcategory"]}" does not exist for category "{transaction_data["category"]}". Please create it first.'}
+
         # Insert transaction into database
         query = """
         INSERT INTO transactions (account_id, date, amount, description, category, subcategory, is_income, notes)
@@ -103,6 +136,39 @@ class TransactionManager:
         current_transaction = self.get_transaction_by_id(transaction_id)
         if not current_transaction:
             return {'error': 'Transaction not found'}
+
+        # Validate category if provided
+        if 'category' in transaction_data and transaction_data['category']:
+            # Check if the category exists
+            category_exists = self.db.execute_query(
+                """
+                SELECT COUNT(*) as count 
+                FROM categories 
+                WHERE name = ?
+                """,
+                (transaction_data['category'],)
+            )
+
+            if not category_exists or category_exists[0]['count'] == 0:
+                # Category doesn't exist - return error
+                return {'error': f'Category "{transaction_data["category"]}" does not exist. Please create it first.'}
+
+            # If subcategory is provided, validate it too
+            if 'subcategory' in transaction_data and transaction_data['subcategory']:
+                subcategory_exists = self.db.execute_query(
+                    """
+                    SELECT COUNT(*) as count 
+                    FROM subcategories s
+                    JOIN categories c ON s.category_id = c.id
+                    WHERE c.name = ? AND s.name = ?
+                    """,
+                    (transaction_data['category'],
+                     transaction_data['subcategory'])
+                )
+
+                if not subcategory_exists or subcategory_exists[0]['count'] == 0:
+                    # Subcategory doesn't exist - return error
+                    return {'error': f'Subcategory "{transaction_data["subcategory"]}" does not exist for category "{transaction_data["category"]}". Please create it first.'}
 
         # Update transaction in database
         fields = []
@@ -149,19 +215,30 @@ class TransactionManager:
         return {'message': 'Transaction deleted successfully'}
 
     def _update_account_balance_after_transaction(self, account_id, amount):
-        """Update account balance after a transaction"""
-        account = self.db.query(
-            "SELECT balance FROM accounts WHERE id = ?", (account_id,))
+        """
+        Update account balance after adding, updating, or deleting a transaction
+
+        Args:
+            account_id (int): ID of the account to update
+            amount (float): Amount to add to the account balance
+        """
+        # Get current account
+        query = "SELECT * FROM accounts WHERE id = ?"
+        account = self.db.execute_query(query, (account_id,))
+
         if not account:
-            return
+            return False
 
-        current_balance = account[0]['balance']
-        new_balance = current_balance + amount
+        # Update account balance
+        new_balance = account[0]['balance'] + amount
 
+        # Update account
         self.db.execute(
-            "UPDATE accounts SET balance = ?, last_updated = ? WHERE id = ?",
+            "UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?",
             (new_balance, datetime.now().isoformat(), account_id)
         )
+
+        return True
 
     def import_from_csv(self, file, account_id):
         """Import transactions from CSV file"""

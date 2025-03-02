@@ -72,6 +72,20 @@ def delete_account(account_id):
     return jsonify(result)
 
 
+@api.route('/accounts/<account_id>', methods=['GET'])
+def get_account(account_id):
+    account = account_manager.get_account_by_id(account_id)
+    if account:
+        return jsonify(account)
+    return jsonify({'error': 'Account not found'}), 404
+
+
+@api.route('/accounts/<account_id>/transactions', methods=['GET'])
+def get_account_transactions(account_id):
+    transactions = transaction_manager.get_transactions_by_account(account_id)
+    return jsonify(transactions)
+
+
 @api.route('/transactions', methods=['GET'])
 def get_transactions():
     account_id = request.args.get('account_id')
@@ -115,6 +129,27 @@ def get_budgets():
 def create_budget():
     budget_data = request.json
     result = budget_manager.create_budget(budget_data)
+    return jsonify(result)
+
+
+@api.route('/budgets/<budget_id>', methods=['GET'])
+def get_budget(budget_id):
+    budget = budget_manager.get_budget(budget_id)
+    if budget:
+        return jsonify(budget)
+    return jsonify({'error': 'Budget not found'}), 404
+
+
+@api.route('/budgets/<budget_id>', methods=['PUT'])
+def update_budget(budget_id):
+    budget_data = request.json
+    result = budget_manager.update_budget(budget_id, budget_data)
+    return jsonify(result)
+
+
+@api.route('/budgets/<budget_id>', methods=['DELETE'])
+def delete_budget(budget_id):
+    result = budget_manager.delete_budget(budget_id)
     return jsonify(result)
 
 
@@ -181,6 +216,15 @@ def process_scheduled_transactions():
     return jsonify(result)
 
 
+@api.route('/scheduled-transactions/<transaction_id>', methods=['GET'])
+def get_scheduled_transaction(transaction_id):
+    transaction = scheduled_transaction_manager.get_scheduled_transaction_by_id(
+        transaction_id)
+    if transaction:
+        return jsonify(transaction)
+    return jsonify({'error': 'Scheduled transaction not found'}), 404
+
+
 # Categories endpoints
 @api.route('/categories', methods=['GET'])
 def get_categories():
@@ -219,6 +263,103 @@ def add_subcategory(category_id):
     subcategory_data = request.json
     result = category_manager.add_subcategory(category_id, subcategory_data)
     return jsonify(result)
+
+
+@api.route('/subcategories/<subcategory_id>', methods=['PUT'])
+def update_subcategory(subcategory_id):
+    subcategory_data = request.json
+    result = category_manager.update_subcategory(
+        subcategory_id, subcategory_data)
+    return jsonify(result)
+
+
+@api.route('/subcategories/<subcategory_id>', methods=['DELETE'])
+def delete_subcategory(subcategory_id):
+    result = category_manager.delete_subcategory(subcategory_id)
+    return jsonify(result)
+
+
+@api.route('/transactions/<transaction_id>', methods=['GET'])
+def get_transaction(transaction_id):
+    transaction = transaction_manager.get_transaction_by_id(transaction_id)
+    if transaction:
+        return jsonify(transaction)
+    return jsonify({'error': 'Transaction not found'}), 404
+
+
+@api.route('/transactions/<transaction_id>', methods=['PUT'])
+def update_transaction(transaction_id):
+    transaction_data = request.json
+    result = transaction_manager.update_transaction(
+        transaction_id, transaction_data)
+    return jsonify(result)
+
+
+@api.route('/transactions/<transaction_id>', methods=['DELETE'])
+def delete_transaction(transaction_id):
+    result = transaction_manager.delete_transaction(transaction_id)
+    return jsonify(result)
+
+
+@api.route('/transactions/by-date', methods=['GET'])
+def get_transactions_by_date_range():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    account_id = request.args.get('account_id')
+
+    if not start_date or not end_date:
+        return jsonify({'error': 'start_date and end_date are required'}), 400
+
+    transactions = transaction_manager.get_transactions_by_date_range(
+        start_date, end_date, account_id)
+    return jsonify(transactions)
+
+
+@api.route('/transactions/by-category', methods=['GET'])
+def get_transactions_by_category():
+    category = request.args.get('category')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    if not category:
+        return jsonify({'error': 'category is required'}), 400
+
+    transactions = transaction_manager.get_transactions_by_category(
+        category, start_date, end_date)
+    return jsonify(transactions)
+
+
+@api.route('/analytics/balance', methods=['GET'])
+def get_balance_over_time():
+    account_id = request.args.get('account_id')
+    timeframe = request.args.get('timeframe', 'month')
+    result = analytics.get_balance_over_time(account_id, timeframe)
+    return jsonify(result)
+
+
+@api.route('/analytics/category-breakdown', methods=['GET'])
+def get_category_breakdown():
+    timeframe = request.args.get('timeframe', 'month')
+    result = analytics.get_category_breakdown(timeframe)
+    return jsonify(result)
+
+
+@api.route('/budgets/progress', methods=['GET'])
+def get_budget_progress():
+    category = request.args.get('category')
+    subcategory = request.args.get('subcategory')
+    period = request.args.get('period', 'monthly')
+    progress = budget_manager.get_budget_progress(
+        category, subcategory, period)
+    return jsonify(progress)
+
+
+@api.route('/categories/<category_id>', methods=['GET'])
+def get_category(category_id):
+    category = category_manager.get_category_by_id(category_id)
+    if category:
+        return jsonify(category)
+    return jsonify({'error': 'Category not found'}), 404
 
 
 # Register the blueprint

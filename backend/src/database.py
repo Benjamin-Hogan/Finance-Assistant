@@ -10,19 +10,15 @@ class Database:
     def __init__(self, db_path=None):
         """Initialize database connection"""
         if db_path is None:
-            # Default to the data directory
-            self.db_path = os.path.join(os.path.dirname(
-                os.path.dirname(__file__)), 'data', 'finance.db')
-        else:
-            self.db_path = db_path
+            # Create data directory if it doesn't exist
+            data_dir = os.path.join(os.path.dirname(
+                os.path.dirname(__file__)), 'data')
+            os.makedirs(data_dir, exist_ok=True)
+            db_path = os.path.join(data_dir, 'finance.db')
 
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-
-        # Initialize database with thread safety
+        self.db_path = db_path
         self.conn = None
-        self.lock = threading.Lock()
-        self.init_db()
+        self.initialize_db()
 
     def get_connection(self):
         """Get a database connection with thread safety"""
@@ -31,168 +27,198 @@ class Database:
             self.conn.row_factory = sqlite3.Row  # Return rows as dictionaries
         return self.conn
 
-    def init_db(self):
-        """Initialize database tables if they don't exist"""
-        with self.lock:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-
-            # Create accounts table
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS accounts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                type TEXT NOT NULL,
-                balance REAL NOT NULL DEFAULT 0,
-                currency TEXT DEFAULT 'USD',
-                institution TEXT,
-                account_number TEXT,
-                notes TEXT,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            ''')
-
-            # Create transactions table
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS transactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                account_id INTEGER NOT NULL,
-                date TIMESTAMP NOT NULL,
-                amount REAL NOT NULL,
-                description TEXT,
-                category TEXT,
-                subcategory TEXT,
-                is_income BOOLEAN DEFAULT 0,
-                notes TEXT,
-                FOREIGN KEY (account_id) REFERENCES accounts(id)
-            )
-            ''')
-
-            # Create scheduled transactions table
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS scheduled_transactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                account_id INTEGER NOT NULL,
-                amount REAL NOT NULL,
-                description TEXT,
-                category TEXT,
-                subcategory TEXT,
-                is_income BOOLEAN DEFAULT 0,
-                frequency TEXT NOT NULL, -- 'daily', 'weekly', 'monthly', 'yearly'
-                start_date TIMESTAMP NOT NULL,
-                end_date TIMESTAMP,
-                last_occurrence TIMESTAMP,
-                next_occurrence TIMESTAMP,
-                day_of_month INTEGER,
-                day_of_week INTEGER,
-                week_of_month INTEGER,
-                month_of_year INTEGER,
-                active BOOLEAN DEFAULT 1,
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (account_id) REFERENCES accounts(id)
-            )
-            ''')
-
-            # Create budgets table
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS budgets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                amount REAL NOT NULL,
-                category TEXT NOT NULL,
-                subcategory TEXT,
-                period TEXT DEFAULT 'monthly',
-                start_date TIMESTAMP,
-                end_date TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            ''')
-
-            # Create categories table for predefined categories
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS categories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                color TEXT,
-                parent_id INTEGER,
-                FOREIGN KEY (parent_id) REFERENCES categories(id)
-            )
-            ''')
-
-            conn.commit()
-
-            # Initialize with default categories if empty
-            cursor.execute('SELECT COUNT(*) FROM categories')
-            if cursor.fetchone()[0] == 0:
-                self._init_default_categories()
-
-    def _init_default_categories(self):
-        """Initialize default categories"""
-        categories = [
-            {'name': 'Income', 'color': '#4CAF50', 'subcategories': [
-                'Salary', 'Dividends', 'Interest', 'Gifts', 'Other']},
-            {'name': 'Housing', 'color': '#2196F3', 'subcategories': [
-                'Rent', 'Mortgage', 'Insurance', 'Utilities', 'Maintenance']},
-            {'name': 'Transportation', 'color': '#FF9800', 'subcategories': [
-                'Car Payment', 'Gas', 'Insurance', 'Maintenance', 'Public Transit']},
-            {'name': 'Food', 'color': '#E91E63', 'subcategories': [
-                'Groceries', 'Dining Out', 'Takeout', 'Coffee']},
-            {'name': 'Shopping', 'color': '#9C27B0', 'subcategories': [
-                'Clothing', 'Electronics', 'Home Goods', 'Gifts']},
-            {'name': 'Entertainment', 'color': '#FF5722', 'subcategories': [
-                'Movies', 'Concerts', 'Subscriptions', 'Hobbies']},
-            {'name': 'Health', 'color': '#607D8B', 'subcategories': [
-                'Medical', 'Pharmacy', 'Fitness', 'Mental Health']},
-            {'name': 'Debt', 'color': '#F44336', 'subcategories': [
-                'Credit Card', 'Student Loans', 'Personal Loans']},
-            {'name': 'Savings', 'color': '#8BC34A', 'subcategories': [
-                'Emergency Fund', 'Retirement', 'Investments', 'Goals']},
-            {'name': 'Education', 'color': '#00BCD4', 'subcategories': [
-                'Tuition', 'Books', 'Courses', 'Supplies']},
-            {'name': 'Miscellaneous', 'color': '#9E9E9E',
-                'subcategories': ['Fees', 'Other']}
-        ]
-
+    def initialize_db(self):
+        """Initialize the database with required tables"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        for category in categories:
-            cursor.execute('INSERT INTO categories (name, color) VALUES (?, ?)',
-                           (category['name'], category['color']))
-            parent_id = cursor.lastrowid
+        # Create accounts table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            balance REAL NOT NULL DEFAULT 0,
+            currency TEXT DEFAULT 'USD',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
 
-            for subcategory in category['subcategories']:
-                cursor.execute('INSERT INTO categories (name, parent_id) VALUES (?, ?)',
-                               (subcategory, parent_id))
+        # Create transactions table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT,
+            subcategory TEXT,
+            is_income BOOLEAN DEFAULT 0,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_id) REFERENCES accounts (id)
+        )
+        ''')
+
+        # Create scheduled transactions table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scheduled_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL,
+            frequency TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT,
+            day_of_month INTEGER,
+            day_of_week INTEGER,
+            category TEXT,
+            subcategory TEXT,
+            is_income BOOLEAN DEFAULT 0,
+            last_occurrence TEXT,
+            next_occurrence TEXT,
+            active BOOLEAN DEFAULT 1,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_id) REFERENCES accounts (id)
+        )
+        ''')
+
+        # Create budgets table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            subcategory TEXT,
+            amount REAL NOT NULL,
+            period TEXT DEFAULT 'monthly',
+            start_date TEXT,
+            end_date TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+
+        # Create categories table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            color TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+
+        # Create subcategories table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS subcategories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            color TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (category_id) REFERENCES categories (id)
+        )
+        ''')
 
         conn.commit()
 
+    def execute_query(self, query, params=None):
+        """Execute a query and return results"""
+        try:
+            cursor = self.conn.cursor()
+            print(f"Executing query: {query}")
+            print(f"With parameters: {params}")
+
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+
+            rows = cursor.fetchall()
+            print(f"Query returned {len(rows)} rows")
+
+            # Convert to list of dictionaries
+            results = [dict(row) for row in rows]
+
+            # Print the first result for debugging
+            if results and len(results) > 0:
+                print(f"First result: {results[0]}")
+
+            return results
+        except Exception as e:
+            print(f"Database error: {e}")
+            return []
+
+    def execute_insert(self, query, params=()):
+        """Execute an INSERT query and return the ID of the inserted row"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+
+        conn.commit()
+        return cursor.lastrowid
+
+    def execute_update(self, query, params=()):
+        """Execute an UPDATE or DELETE query and return the number of affected rows"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+
+        conn.commit()
+        return cursor.rowcount
+
+    def execute_transaction(self, queries):
+        """Execute multiple queries as a transaction"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            for query, params in queries:
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            print(f"Transaction failed: {e}")
+            return False
+
+    # Compatibility methods for older code
     def query(self, sql, params=()):
-        """Execute a query and return results with thread safety"""
-        with self.lock:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            return cursor.fetchall()
+        """Compatibility method for older code - executes a query and returns results"""
+        return self.execute_query(sql, params)
 
     def execute(self, sql, params=()):
-        """Execute a command and commit changes with thread safety"""
-        with self.lock:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            conn.commit()
-            return cursor.lastrowid
+        """Compatibility method for older code - executes a command and returns lastrowid"""
+        return self.execute_insert(sql, params)
 
     def executemany(self, sql, params_list):
-        """Execute many commands with list of parameter tuples with thread safety"""
-        with self.lock:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.executemany(sql, params_list)
-            conn.commit()
-            return cursor.rowcount
+        """Compatibility method for older code - executes many commands"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.executemany(sql, params_list)
+        conn.commit()
+        return cursor.rowcount
 
     def close(self):
         """Close the database connection"""

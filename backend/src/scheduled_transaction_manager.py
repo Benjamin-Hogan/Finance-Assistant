@@ -49,57 +49,73 @@ class ScheduledTransactionManager:
         return [dict(tx) for tx in transactions]
 
     def add_scheduled_transaction(self, transaction_data):
-        """Add a new scheduled transaction"""
+        """Create a new scheduled transaction"""
         required_fields = ['account_id', 'amount',
                            'description', 'frequency', 'start_date']
         for field in required_fields:
             if field not in transaction_data:
                 return {'error': f'Missing required field: {field}'}
 
-        # Calculate the next occurrence date
+        # Validate account exists
+        account = self.db.execute_query(
+            "SELECT id FROM accounts WHERE id = ?",
+            (transaction_data['account_id'],)
+        )
+        if not account:
+            return {'error': 'Account not found'}
+
+        # Validate frequency
+        valid_frequencies = ['daily', 'weekly', 'monthly', 'yearly']
+        if transaction_data['frequency'] not in valid_frequencies:
+            return {'error': f'Invalid frequency. Must be one of: {", ".join(valid_frequencies)}'}
+
+        # Set defaults for optional fields
+        if 'is_income' not in transaction_data:
+            transaction_data['is_income'] = False
+
+        # Calculate next occurrence
         next_occurrence = self._calculate_next_occurrence(
             transaction_data['frequency'],
             transaction_data['start_date'],
-            day_of_month=transaction_data.get('day_of_month'),
-            day_of_week=transaction_data.get('day_of_week'),
-            week_of_month=transaction_data.get('week_of_month'),
-            month_of_year=transaction_data.get('month_of_year')
+            transaction_data.get('day_of_month'),
+            transaction_data.get('day_of_week')
         )
 
-        # Insert scheduled transaction into database
+        # Insert into database
         query = """
         INSERT INTO scheduled_transactions (
-            account_id, amount, description, category, subcategory, is_income, 
-            frequency, start_date, end_date, next_occurrence, 
-            day_of_month, day_of_week, week_of_month, month_of_year,
-            active, notes
+            account_id, amount, description, category, subcategory, is_income,
+            frequency, start_date, end_date, day_of_month, day_of_week,
+            last_occurrence, next_occurrence, active, notes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
-        transaction_id = self.db.execute(
-            query,
-            (
-                transaction_data['account_id'],
-                transaction_data['amount'],
-                transaction_data['description'],
-                transaction_data.get('category'),
-                transaction_data.get('subcategory'),
-                1 if transaction_data.get('is_income', False) else 0,
-                transaction_data['frequency'],
-                transaction_data['start_date'],
-                transaction_data.get('end_date'),
-                next_occurrence,
-                transaction_data.get('day_of_month'),
-                transaction_data.get('day_of_week'),
-                transaction_data.get('week_of_month'),
-                transaction_data.get('month_of_year'),
-                1 if transaction_data.get('active', True) else 0,
-                transaction_data.get('notes')
-            )
+        params = (
+            transaction_data['account_id'],
+            transaction_data['amount'],
+            transaction_data['description'],
+            transaction_data.get('category'),
+            transaction_data.get('subcategory'),
+            transaction_data.get('is_income', False),
+            transaction_data['frequency'],
+            transaction_data['start_date'],
+            transaction_data.get('end_date'),
+            transaction_data.get('day_of_month'),
+            transaction_data.get('day_of_week'),
+            None,  # last_occurrence
+            next_occurrence,
+            transaction_data.get('active', True),
+            transaction_data.get('notes')
         )
 
-        return {'id': transaction_id, 'message': 'Scheduled transaction created successfully'}
+        transaction_id = self.db.execute(query, params)
+
+        return {
+            'id': transaction_id,
+            'message': 'Scheduled transaction created successfully',
+            'next_occurrence': next_occurrence
+        }
 
     def update_scheduled_transaction(self, transaction_id, transaction_data):
         """Update an existing scheduled transaction"""
@@ -110,7 +126,7 @@ class ScheduledTransactionManager:
 
         # Calculate the next occurrence date if frequency parameters changed
         recalculate_next = False
-        for field in ['frequency', 'start_date', 'day_of_month', 'day_of_week', 'week_of_month', 'month_of_year']:
+        for field in ['frequency', 'start_date', 'day_of_month', 'day_of_week']:
             if field in transaction_data and transaction_data[field] != current_transaction.get(field):
                 recalculate_next = True
                 break
@@ -124,11 +140,7 @@ class ScheduledTransactionManager:
                 day_of_month=transaction_data.get(
                     'day_of_month', current_transaction.get('day_of_month')),
                 day_of_week=transaction_data.get(
-                    'day_of_week', current_transaction.get('day_of_week')),
-                week_of_month=transaction_data.get(
-                    'week_of_month', current_transaction.get('week_of_month')),
-                month_of_year=transaction_data.get(
-                    'month_of_year', current_transaction.get('month_of_year'))
+                    'day_of_week', current_transaction.get('day_of_week'))
             )
             transaction_data['next_occurrence'] = next_occurrence
 
@@ -138,8 +150,7 @@ class ScheduledTransactionManager:
 
         for field in ['account_id', 'amount', 'description', 'category', 'subcategory', 'is_income',
                       'frequency', 'start_date', 'end_date', 'next_occurrence',
-                      'day_of_month', 'day_of_week', 'week_of_month', 'month_of_year',
-                      'active', 'notes']:
+                      'day_of_month', 'day_of_week', 'active', 'notes']:
             if field in transaction_data:
                 fields.append(f"{field} = ?")
 
@@ -202,7 +213,7 @@ class ScheduledTransactionManager:
             }
 
             # Use transaction manager to create the transaction
-            from transaction_manager import TransactionManager
+            from .transaction_manager import TransactionManager
             tx_manager = TransactionManager(self.db)
             tx_manager.add_transaction(transaction_data)
 
@@ -212,9 +223,7 @@ class ScheduledTransactionManager:
                 scheduled_tx['frequency'],
                 last_occurrence,  # Use the last occurrence as the reference point
                 day_of_month=scheduled_tx['day_of_month'],
-                day_of_week=scheduled_tx['day_of_week'],
-                week_of_month=scheduled_tx['week_of_month'],
-                month_of_year=scheduled_tx['month_of_year']
+                day_of_week=scheduled_tx['day_of_week']
             )
 
             # Check if this scheduled transaction has reached its end date
@@ -236,49 +245,85 @@ class ScheduledTransactionManager:
 
         return {'processed': processed_count, 'message': f'Processed {processed_count} scheduled transactions'}
 
-    def _calculate_next_occurrence(self, frequency, reference_date, day_of_month=None,
-                                   day_of_week=None, week_of_month=None, month_of_year=None):
-        """Calculate the next occurrence date based on frequency and reference date"""
-        if isinstance(reference_date, str):
-            reference_date = datetime.fromisoformat(
-                reference_date.replace('Z', '+00:00'))
+    def _calculate_next_occurrence(self, frequency, start_date, day_of_month=None, day_of_week=None):
+        """
+        Calculate the next occurrence of a scheduled transaction
+
+        Args:
+            frequency (str): The frequency of the transaction ('daily', 'weekly', 'monthly', 'yearly')
+            start_date (str): The start date of the transaction in ISO format
+            day_of_month (int, optional): The day of month for monthly transactions
+            day_of_week (int, optional): The day of week for weekly transactions (0=Monday, 6=Sunday)
+
+        Returns:
+            str: The next occurrence date in ISO format
+        """
+        # Parse the start date
+        try:
+            if isinstance(start_date, str):
+                if 'Z' in start_date:
+                    start_date = datetime.fromisoformat(
+                        start_date.replace('Z', '+00:00'))
+                elif 'T' in start_date:
+                    start_date = datetime.fromisoformat(start_date)
+                else:
+                    # Handle YYYY-MM-DD format
+                    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            elif isinstance(start_date, datetime):
+                # Already a datetime object
+                pass
+            else:
+                # Unknown format, use today
+                start_date = datetime.now()
+        except (ValueError, TypeError):
+            # If parsing fails, use today
+            start_date = datetime.now()
 
         today = datetime.now()
-        if reference_date < today:
-            reference_date = today
 
+        # If start date is in the future, that's the next occurrence
+        if start_date > today:
+            return start_date.isoformat()
+
+        # Calculate next occurrence based on frequency
         if frequency == 'daily':
-            return (reference_date + timedelta(days=1)).isoformat()
-
+            # Next occurrence is tomorrow
+            next_date = today + timedelta(days=1)
         elif frequency == 'weekly':
-            return (reference_date + timedelta(days=7)).isoformat()
-
-        elif frequency == 'monthly':
-            # Calculate the next month's date, handling month end correctly
-            next_month = reference_date.month + 1
-            next_year = reference_date.year
-
-            if next_month > 12:
-                next_month = 1
-                next_year += 1
-
-            # Use the specified day of month if provided
-            if day_of_month:
-                target_day = min(day_of_month, calendar.monthrange(
-                    next_year, next_month)[1])
+            # Calculate days until the next occurrence
+            if day_of_week is not None:
+                # Calculate the next occurrence based on day_of_week
+                days_ahead = day_of_week - today.weekday()
+                if days_ahead <= 0:  # Target day already happened this week
+                    days_ahead += 7
+                next_date = today + timedelta(days=days_ahead)
             else:
-                # Otherwise try to use the same day as the reference date
-                target_day = min(reference_date.day,
-                                 calendar.monthrange(next_year, next_month)[1])
-
-            next_date = datetime(next_year, next_month, target_day)
-            return next_date.isoformat()
-
+                # If no day_of_week specified, use same day next week
+                next_date = today + timedelta(days=7)
+        elif frequency == 'monthly':
+            # Calculate the next occurrence based on day_of_month
+            if day_of_month is not None:
+                # If today is after the day of month, move to next month
+                if today.day >= day_of_month:
+                    if today.month == 12:
+                        next_date = datetime(today.year + 1, 1, day_of_month)
+                    else:
+                        next_date = datetime(
+                            today.year, today.month + 1, day_of_month)
+                else:
+                    next_date = datetime(today.year, today.month, day_of_month)
+            else:
+                # If no day_of_month specified, use same day next month
+                if today.month == 12:
+                    next_date = datetime(today.year + 1, 1, today.day)
+                else:
+                    next_date = datetime(
+                        today.year, today.month + 1, today.day)
         elif frequency == 'yearly':
-            # Move to next year, same month and day
-            next_date = datetime(reference_date.year + 1,
-                                 reference_date.month, reference_date.day)
-            return next_date.isoformat()
+            # Next occurrence is same day next year
+            next_date = datetime(today.year + 1, today.month, today.day)
+        else:
+            # Invalid frequency
+            return None
 
-        # Default fallback
-        return (reference_date + timedelta(days=30)).isoformat()
+        return next_date.isoformat()

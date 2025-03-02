@@ -996,6 +996,175 @@ const Transactions = ({ apiService }) => {
                       rows={3}
                     />
                   </Grid>
+
+                  {/* Transaction Impact Preview */}
+                  {currentTransaction.account_id &&
+                    currentTransaction.amount > 0 && (
+                      <Grid item xs={12}>
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 2,
+                            mt: 2,
+                            bgcolor: "background.paper",
+                            borderRadius: 1,
+                            borderColor: "divider",
+                          }}
+                        >
+                          <Typography
+                            variant="subtitle1"
+                            gutterBottom
+                            fontWeight="bold"
+                          >
+                            Transaction Impact Preview
+                          </Typography>
+
+                          {(() => {
+                            const selectedAccount = accounts.find(
+                              (acc) => acc.id === currentTransaction.account_id
+                            );
+                            if (!selectedAccount) return null;
+
+                            const currentBalance = selectedAccount.balance;
+                            const transactionAmount =
+                              currentTransaction.amount || 0;
+                            const isIncome = currentTransaction.is_income;
+                            const newBalance = isIncome
+                              ? currentBalance + transactionAmount
+                              : currentBalance - transactionAmount;
+
+                            const isPositiveChange =
+                              isIncome || transactionAmount === 0;
+
+                            return (
+                              <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Account: {selectedAccount.name}
+                                  </Typography>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      mt: 1,
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Current Balance:
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ ml: 1 }}>
+                                      {formatCurrency(currentBalance)}
+                                    </Typography>
+                                  </Box>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      New Balance:
+                                    </Typography>
+                                    <Typography
+                                      variant="body1"
+                                      fontWeight="bold"
+                                      color={
+                                        newBalance >= 0
+                                          ? "success.main"
+                                          : "error.main"
+                                      }
+                                      sx={{ ml: 1 }}
+                                    >
+                                      {formatCurrency(newBalance)}
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Transaction Details
+                                  </Typography>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      mt: 1,
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Type:
+                                    </Typography>
+                                    <Typography
+                                      variant="body1"
+                                      sx={{ ml: 1 }}
+                                      color={
+                                        isIncome ? "success.main" : "error.main"
+                                      }
+                                    >
+                                      {isIncome ? "Income" : "Expense"}
+                                    </Typography>
+                                  </Box>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Amount:
+                                    </Typography>
+                                    <Typography
+                                      variant="body1"
+                                      fontWeight="bold"
+                                      color={
+                                        isIncome ? "success.main" : "error.main"
+                                      }
+                                      sx={{ ml: 1 }}
+                                    >
+                                      {isIncome ? "+" : "-"}
+                                      {formatCurrency(transactionAmount)}
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                  <Divider sx={{ my: 1 }} />
+                                  <Alert
+                                    severity={
+                                      isPositiveChange ? "info" : "warning"
+                                    }
+                                    variant="outlined"
+                                    sx={{ mt: 1 }}
+                                  >
+                                    {isPositiveChange
+                                      ? "This will increase your account balance."
+                                      : "This will decrease your account balance."}
+                                  </Alert>
+                                </Grid>
+                              </Grid>
+                            );
+                          })()}
+                        </Paper>
+                      </Grid>
+                    )}
                 </Grid>
               </DialogContent>
               <DialogActions>

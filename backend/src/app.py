@@ -121,8 +121,65 @@ def import_csv():
 
 @api.route('/budgets', methods=['GET'])
 def get_budgets():
-    budgets = budget_manager.get_all_budgets()
-    return jsonify(budgets)
+    # Print the complete request to debug
+    print(f"GET /budgets request received")
+    print(f"Query parameters: {request.args}")
+
+    # Extract and validate date parameters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    # Extract explicit month_year parameter
+    month_year = request.args.get('month_year')
+
+    print(
+        f"Extracted parameters: start_date={start_date}, end_date={end_date}, month_year={month_year}")
+
+    try:
+        # Return appropriate budgets based on the parameters
+        if month_year:
+            # If month_year is provided, use it as the primary filtering mechanism
+            print(f"Filtering budgets by month_year: {month_year}")
+
+            # Parse the month_year to create date bounds if start_date or end_date is missing
+            if not (start_date and end_date):
+                year, month = map(int, month_year.split('-'))
+
+                # Create first day of month if start_date is missing
+                if not start_date:
+                    from datetime import datetime
+                    start_date = datetime(year, month, 1).isoformat()
+
+                # Create last day of month if end_date is missing
+                if not end_date:
+                    import calendar
+                    from datetime import datetime
+                    last_day = calendar.monthrange(year, month)[1]
+                    end_date = datetime(
+                        year, month, last_day, 23, 59, 59).isoformat()
+
+                print(
+                    f"Derived date range from month_year: {start_date} to {end_date}")
+
+            budgets = budget_manager.get_budgets_by_date_range(
+                start_date, end_date, month_year=month_year)
+        elif start_date and end_date:
+            print(
+                f"Filtering budgets by date range: {start_date} to {end_date}")
+            budgets = budget_manager.get_budgets_by_date_range(
+                start_date, end_date)
+        else:
+            print("No filtering parameters found, returning all budgets")
+            budgets = budget_manager.get_all_budgets()
+
+        print(f"Returning {len(budgets)} budgets")
+        for budget in budgets[:3]:  # Log first 3 budgets for debugging
+            print(
+                f"  Budget: {budget['category']} - {budget.get('subcategory', 'N/A')} - Amount: {budget['amount']}")
+
+        return jsonify(budgets)
+    except Exception as e:
+        print(f"Error in /budgets endpoint: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve budgets: {str(e)}"}), 500
 
 
 @api.route('/budgets', methods=['POST'])

@@ -25,6 +25,7 @@ import {
   Tooltip,
   Snackbar,
   Alert,
+  Paper,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -446,6 +447,196 @@ const Accounts = ({ apiService }) => {
                 <MenuItem value="AUD">AUD ($)</MenuItem>
               </Select>
             </FormControl>
+
+            {/* Account Impact Preview */}
+            {currentAccount.balance !== "" && (
+              <Box sx={{ mt: 3 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    bgcolor: "background.paper",
+                    borderRadius: 1,
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    gutterBottom
+                    fontWeight="bold"
+                  >
+                    Account Impact Preview
+                  </Typography>
+
+                  {(() => {
+                    // Calculate current net worth from existing accounts
+                    const isAssetType = ![
+                      "credit",
+                      "loan",
+                      "mortgage",
+                      "debt",
+                    ].includes(currentAccount.type);
+
+                    // Calculate net worth information
+                    const existingAssets = accounts
+                      .filter(
+                        (account) =>
+                          !["credit", "loan", "mortgage", "debt"].includes(
+                            account.type
+                          ) &&
+                          (!editMode || account.id !== currentAccount.id)
+                      )
+                      .reduce((sum, account) => sum + account.balance, 0);
+
+                    const existingLiabilities = accounts
+                      .filter(
+                        (account) =>
+                          ["credit", "loan", "mortgage", "debt"].includes(
+                            account.type
+                          ) &&
+                          (!editMode || account.id !== currentAccount.id)
+                      )
+                      .reduce((sum, account) => sum + account.balance, 0);
+
+                    // Calculate new values with this account
+                    const newBalance = parseFloat(currentAccount.balance) || 0;
+                    const newAssets = isAssetType
+                      ? existingAssets + newBalance
+                      : existingAssets;
+
+                    const newLiabilities = !isAssetType
+                      ? existingLiabilities + newBalance
+                      : existingLiabilities;
+
+                    const currentNetWorth =
+                      existingAssets - existingLiabilities;
+                    const newNetWorth = newAssets - newLiabilities;
+                    const netWorthChange = newNetWorth - currentNetWorth;
+
+                    return (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            Account Type
+                          </Typography>
+                          <Typography variant="body1">
+                            {currentAccount.type.charAt(0).toUpperCase() +
+                              currentAccount.type.slice(1)}
+                            {isAssetType ? " (Asset)" : " (Liability)"}
+                          </Typography>
+
+                          <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              Account Balance
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              fontWeight="bold"
+                              color={
+                                (isAssetType && newBalance > 0) ||
+                                (!isAssetType && newBalance < 0)
+                                  ? "success.main"
+                                  : "error.main"
+                              }
+                            >
+                              {formatCurrency(newBalance)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            Net Worth Impact
+                          </Typography>
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              mt: 1,
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              Current:
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              sx={{ ml: 1 }}
+                              color={
+                                currentNetWorth >= 0
+                                  ? "success.main"
+                                  : "error.main"
+                              }
+                            >
+                              {formatCurrency(currentNetWorth)}
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <Typography variant="body2" color="text.secondary">
+                              New:
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              fontWeight="bold"
+                              sx={{ ml: 1 }}
+                              color={
+                                newNetWorth >= 0 ? "success.main" : "error.main"
+                              }
+                            >
+                              {formatCurrency(newNetWorth)}
+                            </Typography>
+                          </Box>
+
+                          {editMode && (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                mt: 1,
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Change:
+                              </Typography>
+                              <Typography
+                                variant="body1"
+                                fontWeight="bold"
+                                sx={{ ml: 1 }}
+                                color={
+                                  netWorthChange >= 0
+                                    ? "success.main"
+                                    : "error.main"
+                                }
+                              >
+                                {netWorthChange > 0 ? "+" : ""}
+                                {formatCurrency(netWorthChange)}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Grid>
+
+                        <Grid item xs={12}>
+                          <Divider sx={{ my: 1 }} />
+                          <Alert
+                            severity={isAssetType ? "info" : "warning"}
+                            variant="outlined"
+                            sx={{ mt: 1 }}
+                          >
+                            {isAssetType
+                              ? "Assets contribute positively to your net worth."
+                              : "Liabilities reduce your net worth. Make sure to enter a positive value for the balance amount."}
+                          </Alert>
+                        </Grid>
+                      </Grid>
+                    );
+                  })()}
+                </Paper>
+              </Box>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -453,7 +644,9 @@ const Accounts = ({ apiService }) => {
           <Button
             onClick={handleSaveAccount}
             variant="contained"
-            disabled={!currentAccount.name || currentAccount.balance === ""}
+            disabled={
+              !currentAccount.name || currentAccount.balance === undefined
+            }
           >
             Save
           </Button>

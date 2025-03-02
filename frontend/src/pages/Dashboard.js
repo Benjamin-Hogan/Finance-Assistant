@@ -14,6 +14,7 @@ import {
   ListItem,
   ListItemText,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import {
   AccountBalance as AccountsIcon,
@@ -25,7 +26,7 @@ import {
 import {
   Chart as ChartJS,
   ArcElement,
-  Tooltip,
+  Tooltip as ChartTooltip,
   Legend,
   CategoryScale,
   LinearScale,
@@ -38,7 +39,7 @@ import { Doughnut, Line } from "react-chartjs-2";
 // Register ChartJS components
 ChartJS.register(
   ArcElement,
-  Tooltip,
+  ChartTooltip,
   Legend,
   CategoryScale,
   LinearScale,
@@ -193,14 +194,49 @@ const Dashboard = ({ apiService }) => {
               <Typography variant="h4">
                 {formatCurrency(netWorth.assets)}
               </Typography>
-              <Typography
-                variant="body2"
-                color="success.main"
-                sx={{ display: "flex", alignItems: "center" }}
+              <Tooltip
+                title={
+                  <Box sx={{ p: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Asset Breakdown
+                    </Typography>
+                    {accounts
+                      .filter(
+                        (account) =>
+                          !["credit", "loan", "mortgage", "debt"].includes(
+                            account.type
+                          )
+                      )
+                      .map((account) => (
+                        <Box
+                          key={account.id}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 0.5,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ mr: 2 }}>
+                            {account.name}:
+                          </Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {formatCurrency(account.balance)}
+                          </Typography>
+                        </Box>
+                      ))}
+                  </Box>
+                }
+                arrow
               >
-                <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                +2.5% this month
-              </Typography>
+                <Typography
+                  variant="body2"
+                  color="success.main"
+                  sx={{ display: "flex", alignItems: "center", cursor: "help" }}
+                >
+                  <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
+                  +2.5% this month
+                </Typography>
+              </Tooltip>
             </CardContent>
           </Card>
         </Grid>
@@ -213,14 +249,48 @@ const Dashboard = ({ apiService }) => {
               <Typography variant="h4">
                 {formatCurrency(Math.abs(netWorth.liabilities))}
               </Typography>
-              <Typography
-                variant="body2"
-                color="error.main"
-                sx={{ display: "flex", alignItems: "center" }}
+              <Tooltip
+                title={
+                  <Box sx={{ p: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Liability Breakdown
+                    </Typography>
+                    {accounts
+                      .filter((account) =>
+                        ["credit", "loan", "mortgage", "debt"].includes(
+                          account.type
+                        )
+                      )
+                      .map((account) => (
+                        <Box
+                          key={account.id}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 0.5,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ mr: 2 }}>
+                            {account.name}:
+                          </Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {formatCurrency(account.balance)}
+                          </Typography>
+                        </Box>
+                      ))}
+                  </Box>
+                }
+                arrow
               >
-                <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
-                +1.2% this month
-              </Typography>
+                <Typography
+                  variant="body2"
+                  color="error.main"
+                  sx={{ display: "flex", alignItems: "center", cursor: "help" }}
+                >
+                  <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
+                  +1.2% this month
+                </Typography>
+              </Tooltip>
             </CardContent>
           </Card>
         </Grid>
@@ -233,23 +303,95 @@ const Dashboard = ({ apiService }) => {
               <Typography variant="h4">
                 {formatCurrency(netWorth.net_worth)}
               </Typography>
-              <Typography
-                variant="body2"
-                color={netWorth.net_worth >= 0 ? "success.main" : "error.main"}
-                sx={{ display: "flex", alignItems: "center" }}
+              <Tooltip
+                title={
+                  <Box sx={{ p: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Net Worth Calculation
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ mr: 2 }}>
+                        Total Assets:
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="success.main"
+                        fontWeight="medium"
+                      >
+                        {formatCurrency(netWorth.assets)}
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ mr: 2 }}>
+                        Total Liabilities:
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="error.main"
+                        fontWeight="medium"
+                      >
+                        {formatCurrency(Math.abs(netWorth.liabilities))}
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 1 }} />
+                    <Box
+                      sx={{ display: "flex", justifyContent: "space-between" }}
+                    >
+                      <Typography
+                        variant="body2"
+                        fontWeight="bold"
+                        sx={{ mr: 2 }}
+                      >
+                        Net Worth:
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        fontWeight="bold"
+                        color={
+                          netWorth.net_worth >= 0
+                            ? "success.main"
+                            : "error.main"
+                        }
+                      >
+                        {formatCurrency(netWorth.net_worth)}
+                      </Typography>
+                    </Box>
+                  </Box>
+                }
+                arrow
               >
-                {netWorth.net_worth >= 0 ? (
-                  <>
-                    <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                    +3.7% this month
-                  </>
-                ) : (
-                  <>
-                    <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
-                    -1.5% this month
-                  </>
-                )}
-              </Typography>
+                <Typography
+                  variant="body2"
+                  color={
+                    netWorth.net_worth >= 0 ? "success.main" : "error.main"
+                  }
+                  sx={{ display: "flex", alignItems: "center", cursor: "help" }}
+                >
+                  {netWorth.net_worth >= 0 ? (
+                    <>
+                      <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      +3.7% this month
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      -1.5% this month
+                    </>
+                  )}
+                </Typography>
+              </Tooltip>
             </CardContent>
           </Card>
         </Grid>
@@ -276,6 +418,31 @@ const Dashboard = ({ apiService }) => {
                       plugins: {
                         legend: {
                           position: "right",
+                        },
+                        tooltip: {
+                          callbacks: {
+                            label: function (context) {
+                              let label = context.label || "";
+                              if (label) {
+                                label += ": ";
+                              }
+                              const value = context.parsed;
+                              const total = context.dataset.data.reduce(
+                                (a, b) => a + b,
+                                0
+                              );
+                              const percentage = Math.round(
+                                (value / total) * 100
+                              );
+
+                              label +=
+                                formatCurrency(value) +
+                                " (" +
+                                percentage +
+                                "%)";
+                              return label;
+                            },
+                          },
                         },
                       },
                     }}
@@ -390,6 +557,39 @@ const Dashboard = ({ apiService }) => {
                     plugins: {
                       legend: {
                         display: false,
+                      },
+                      tooltip: {
+                        callbacks: {
+                          title: function (context) {
+                            return context[0].label;
+                          },
+                          label: function (context) {
+                            return (
+                              "Balance: " + formatCurrency(context.parsed.y)
+                            );
+                          },
+                          footer: function (context) {
+                            const currentValue = context[0].parsed.y;
+                            const dataIndex = context[0].dataIndex;
+
+                            if (dataIndex > 0) {
+                              const previousValue =
+                                context[0].dataset.data[dataIndex - 1];
+                              const change = currentValue - previousValue;
+                              const percentChange = (
+                                (change / previousValue) *
+                                100
+                              ).toFixed(1);
+
+                              return `Change: ${
+                                change >= 0 ? "+" : ""
+                              }${formatCurrency(change)} (${
+                                change >= 0 ? "+" : ""
+                              }${percentChange}%)`;
+                            }
+                            return "";
+                          },
+                        },
                       },
                     },
                     scales: {

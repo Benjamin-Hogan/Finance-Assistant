@@ -46,6 +46,26 @@ class AccountManager:
             )
         )
 
+        # Create a transaction for the initial balance (if non-zero)
+        initial_balance = account_data.get('balance', 0.0)
+        if initial_balance != 0:
+            # Create a transaction record for account creation
+            transaction_query = """
+            INSERT INTO transactions (account_id, date, amount, description, is_income)
+            VALUES (?, ?, ?, ?, ?)
+            """
+            is_income = 1 if initial_balance > 0 else 0
+            self.db.execute(
+                transaction_query,
+                (
+                    account_id,
+                    datetime.now().isoformat(),
+                    initial_balance,
+                    f"Account {account_data['name']} creation",
+                    is_income
+                )
+            )
+
         return {'id': account_id, 'message': 'Account created successfully'}
 
     def update_account(self, account_id, account_data):

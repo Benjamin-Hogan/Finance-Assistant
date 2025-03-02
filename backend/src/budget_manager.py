@@ -297,3 +297,69 @@ class BudgetManager:
             'period': period,
             'remaining': budget_amount - spent
         }
+
+    def get_budgets_by_date_range(self, start_date, end_date, month_year=None):
+        """Get budgets that fall within the specified date range
+
+        Args:
+            start_date: Start date in ISO format
+            end_date: End date in ISO format
+            month_year: Optional explicit month-year string in format 'YYYY-MM'
+        """
+        print(f"Filtering budgets by date range: {start_date} to {end_date}")
+
+        try:
+            # Use the explicit month_year if provided, otherwise extract from start_date
+            if month_year:
+                # Parse the month_year directly (format: YYYY-MM)
+                start_month_year = month_year
+                print(f"Using explicit month_year parameter: {month_year}")
+            else:
+                # Parse the date string to extract year-month
+                if isinstance(start_date, str):
+                    start_dt = datetime.fromisoformat(
+                        start_date.replace('Z', '+00:00'))
+                    start_month_year = start_dt.strftime('%Y-%m')
+                else:
+                    start_month_year = start_date.strftime('%Y-%m')
+
+            print(f"Filtering budgets for month-year: {start_month_year}")
+
+            # Extract year and month from month-year string
+            year, month = map(int, start_month_year.split('-'))
+
+            # Highly simplified query that focuses on the specified month-year
+            query = """
+            SELECT b.id, b.category, b.subcategory, b.amount, b.period, b.start_date, b.end_date
+            FROM budgets b
+            WHERE 
+                -- For monthly budgets, match by the month-year string
+                (b.period = 'monthly' AND 
+                (strftime('%Y-%m', COALESCE(b.start_date, ?)) = ? OR b.start_date IS NULL))
+                
+                -- For non-monthly budgets, include those within the date range
+                OR ((b.period != 'monthly') AND 
+                    (b.start_date IS NULL OR b.start_date <= ?) 
+                    AND (b.end_date IS NULL OR b.end_date >= ?))
+            ORDER BY b.category, b.subcategory
+            """
+
+            print(f"SQL Query: {query}")
+            print(
+                f"Parameters: month_year={start_month_year}, start_date={start_date}, end_date={end_date}")
+
+            budgets = self.db.execute_query(
+                query, (start_month_year, start_month_year, end_date, start_date))
+
+            print(
+                f"Found {len(budgets)} budgets for month-year: {start_month_year}")
+            for budget in budgets:
+                print(
+                    f"  Budget: {budget['category']} - {budget.get('subcategory', 'N/A')} - Amount: {budget['amount']}")
+
+            return budgets
+
+        except Exception as e:
+            print(f"Error filtering budgets by date range: {e}")
+            # Fallback to get all budgets if there's an error
+            return self.get_all_budgets()

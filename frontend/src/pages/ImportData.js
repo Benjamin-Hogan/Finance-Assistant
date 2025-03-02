@@ -25,6 +25,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import {
   CloudUpload as UploadIcon,
@@ -38,7 +40,11 @@ const ImportData = ({ apiService }) => {
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
-  const [previewData, setPreviewData] = useState([]);
+  const [previewData, setPreviewData] = useState({
+    rows: [],
+    stats: {},
+    headers: [],
+  });
   const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState(null);
 
@@ -77,24 +83,102 @@ const ImportData = ({ apiService }) => {
       const headers = lines[0].split(",");
 
       const previewRows = [];
-      // Parse up to 5 rows for preview
-      for (let i = 1; i < Math.min(lines.length, 6); i++) {
+      let validRows = 0;
+      let invalidRows = 0;
+      let totalAmount = 0;
+
+      // Parse up to 10 rows for preview
+      for (let i = 1; i < Math.min(lines.length, 11); i++) {
         if (lines[i].trim() === "") continue;
 
         const rowData = lines[i].split(",");
-        const row = {};
+        const row = {
+          _rowIndex: i,
+          _isValid: true,
+          _validationIssues: [],
+        };
 
         headers.forEach((header, index) => {
-          row[header.trim()] = rowData[index]?.trim() || "";
+          const trimmedHeader = header.trim();
+          row[trimmedHeader] = rowData[index]?.trim() || "";
+
+          // Perform basic validation
+          if (
+            trimmedHeader.toLowerCase() === "date" ||
+            trimmedHeader.toLowerCase() === "transaction_date"
+          ) {
+            if (!row[trimmedHeader] || !isValidDate(row[trimmedHeader])) {
+              row._isValid = false;
+              row._validationIssues.push(`Invalid date: ${row[trimmedHeader]}`);
+            }
+          }
+
+          if (trimmedHeader.toLowerCase() === "amount") {
+            if (!row[trimmedHeader] || isNaN(parseFloat(row[trimmedHeader]))) {
+              row._isValid = false;
+              row._validationIssues.push(
+                `Invalid amount: ${row[trimmedHeader]}`
+              );
+            } else {
+              const amount = parseFloat(row[trimmedHeader]);
+              totalAmount += amount;
+            }
+          }
+
+          if (
+            trimmedHeader.toLowerCase() === "description" &&
+            !row[trimmedHeader]
+          ) {
+            row._validationIssues.push("Missing description");
+          }
         });
+
+        if (row._isValid) {
+          validRows++;
+        } else {
+          invalidRows++;
+        }
 
         previewRows.push(row);
       }
 
-      setPreviewData(previewRows);
+      // Calculate total rows in the file (excluding header)
+      const totalRows = lines.length > 1 ? lines.length - 1 : 0;
+
+      setPreviewData({
+        rows: previewRows,
+        stats: {
+          totalRows,
+          previewedRows: previewRows.length,
+          validRows,
+          invalidRows,
+          totalAmount,
+        },
+        headers,
+      });
     };
 
     reader.readAsText(file);
+  };
+
+  // Helper function to validate dates
+  const isValidDate = (dateString) => {
+    // Check various date formats
+    const formats = [
+      /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
+      /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY
+      /^\d{2}-\d{2}-\d{4}$/, // MM-DD-YYYY
+      /^\d{1,2}\s[a-zA-Z]{3}\s\d{4}$/, // D MMM YYYY
+    ];
+
+    for (const format of formats) {
+      if (format.test(dateString)) {
+        const d = new Date(dateString);
+        return !isNaN(d.getTime());
+      }
+    }
+
+    return false;
   };
 
   const handleImport = async () => {
@@ -124,7 +208,7 @@ const ImportData = ({ apiService }) => {
     setActiveStep(0);
     setSelectedAccount("");
     setSelectedFile(null);
-    setPreviewData([]);
+    setPreviewData({ rows: [], stats: {}, headers: [] });
     setImportResult(null);
     setError(null);
   };
@@ -189,35 +273,173 @@ const ImportData = ({ apiService }) => {
               </label>
             </Box>
 
-            {selectedFile && previewData.length > 0 && (
-              <Box sx={{ mt: 3 }}>
+            {activeStep === 1 && (
+              <>
                 <Typography variant="h6" gutterBottom>
-                  Preview:
+                  Preview and Confirm
                 </Typography>
-                <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
-                  <Table stickyHeader size="small">
-                    <TableHead>
-                      <TableRow>
-                        {Object.keys(previewData[0]).map((header) => (
-                          <TableCell key={header}>{header}</TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {previewData.map((row, index) => (
-                        <TableRow key={index}>
-                          {Object.values(row).map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
+
+                {previewData.rows && previewData.rows.length > 0 ? (
+                  <>
+                    <Paper
+                      elevation={0}
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        mb: 3,
+                        bgcolor: "background.paper",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        gutterBottom
+                        fontWeight="bold"
+                      >
+                        Import Summary
+                      </Typography>
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            File Contains
+                          </Typography>
+                          <Typography variant="body1" fontWeight="medium">
+                            {previewData.stats.totalRows} transactions
+                          </Typography>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Validation Status
+                          </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <Typography
+                              variant="body1"
+                              color={
+                                previewData.stats.invalidRows > 0
+                                  ? "error.main"
+                                  : "success.main"
+                              }
+                              fontWeight="medium"
+                            >
+                              {previewData.stats.invalidRows > 0
+                                ? `${previewData.stats.invalidRows} issues found`
+                                : "All previewed rows valid"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Total Amount
+                          </Typography>
+                          <Typography
+                            variant="body1"
+                            fontWeight="medium"
+                            color={
+                              previewData.stats.totalAmount >= 0
+                                ? "success.main"
+                                : "error.main"
+                            }
+                          >
+                            {new Intl.NumberFormat("en-US", {
+                              style: "currency",
+                              currency: "USD",
+                            }).format(previewData.stats.totalAmount)}
+                          </Typography>
+                        </Grid>
+
+                        {previewData.stats.invalidRows > 0 && (
+                          <Grid item xs={12}>
+                            <Alert severity="warning" sx={{ mt: 1 }}>
+                              Some transactions have validation issues. They
+                              will be skipped during import.
+                            </Alert>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </Paper>
+
+                    <TableContainer
+                      component={Paper}
+                      sx={{ maxHeight: 350, overflow: "auto" }}
+                    >
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell width={50}>#</TableCell>
+                            {previewData.headers.map((header, index) => (
+                              <TableCell key={index}>{header.trim()}</TableCell>
+                            ))}
+                            <TableCell>Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {previewData.rows.map((row, rowIndex) => (
+                            <TableRow
+                              key={rowIndex}
+                              sx={{
+                                bgcolor: row._isValid
+                                  ? "inherit"
+                                  : "error.lighter",
+                                "&:hover": {
+                                  bgcolor: row._isValid
+                                    ? "action.hover"
+                                    : "error.light",
+                                },
+                              }}
+                            >
+                              <TableCell>{row._rowIndex}</TableCell>
+                              {previewData.headers.map((header, cellIndex) => (
+                                <TableCell key={cellIndex}>
+                                  {row[header.trim()] || ""}
+                                </TableCell>
+                              ))}
+                              <TableCell>
+                                {row._isValid ? (
+                                  <Chip
+                                    size="small"
+                                    color="success"
+                                    label="Valid"
+                                  />
+                                ) : (
+                                  <Tooltip
+                                    title={row._validationIssues.join("; ")}
+                                  >
+                                    <Chip
+                                      size="small"
+                                      color="error"
+                                      label="Invalid"
+                                    />
+                                  </Tooltip>
+                                )}
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <Typography variant="caption" sx={{ display: "block", mt: 1 }}>
-                  Showing preview of first {previewData.length} rows
-                </Typography>
-              </Box>
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+
+                    {previewData.stats.totalRows >
+                      previewData.stats.previewedRows && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        align="center"
+                        sx={{ mt: 2 }}
+                      >
+                        Showing {previewData.stats.previewedRows} out of{" "}
+                        {previewData.stats.totalRows} total transactions
+                      </Typography>
+                    )}
+                  </>
+                ) : (
+                  <Typography variant="body1" color="text.secondary">
+                    No preview data available
+                  </Typography>
+                )}
+              </>
             )}
 
             <Box sx={{ mt: 3, display: "flex", gap: 2 }}>

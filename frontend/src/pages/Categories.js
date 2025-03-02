@@ -422,31 +422,100 @@ const Categories = ({ apiService }) => {
             required
           />
 
-          <TextField
-            name="color"
-            label="Color"
-            fullWidth
-            margin="normal"
-            value={currentCategory.color}
-            onChange={handleInputChange}
-            placeholder="#9E9E9E"
-            helperText="Hex color code (e.g., #FF5733)"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
+          <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+            Select Category Color
+          </Typography>
+
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              mb: 2,
+              borderRadius: 1,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 1,
+                justifyContent: "center",
+              }}
+            >
+              {[
+                "#F44336", // Red
+                "#E91E63", // Pink
+                "#9C27B0", // Purple
+                "#673AB7", // Deep Purple
+                "#3F51B5", // Indigo
+                "#2196F3", // Blue
+                "#03A9F4", // Light Blue
+                "#00BCD4", // Cyan
+                "#009688", // Teal
+                "#4CAF50", // Green
+                "#8BC34A", // Light Green
+                "#CDDC39", // Lime
+                "#FFEB3B", // Yellow
+                "#FFC107", // Amber
+                "#FF9800", // Orange
+                "#FF5722", // Deep Orange
+                "#795548", // Brown
+                "#9E9E9E", // Grey
+                "#607D8B", // Blue Grey
+              ].map((color) => (
+                <Tooltip key={color} title={color} arrow>
                   <Box
                     sx={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 1,
-                      bgcolor: currentCategory.color,
-                      border: "1px solid rgba(0,0,0,0.12)",
+                      width: 36,
+                      height: 36,
+                      bgcolor: color,
+                      borderRadius: "50%",
+                      cursor: "pointer",
+                      border:
+                        currentCategory.color === color
+                          ? "3px solid #000"
+                          : "1px solid rgba(0,0,0,0.12)",
+                      boxShadow: currentCategory.color === color ? 3 : 0,
+                      transition: "all 0.2s",
+                      "&:hover": {
+                        transform: "scale(1.1)",
+                      },
                     }}
+                    onClick={() =>
+                      setCurrentCategory((prev) => ({ ...prev, color }))
+                    }
                   />
-                </InputAdornment>
-              ),
-            }}
-          />
+                </Tooltip>
+              ))}
+            </Box>
+
+            <Box
+              sx={{
+                mt: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                Current Selection:
+              </Typography>
+              <Box
+                sx={{
+                  display: "inline-block",
+                  width: 20,
+                  height: 20,
+                  borderRadius: 1,
+                  bgcolor: currentCategory.color,
+                  border: "1px solid rgba(0,0,0,0.12)",
+                  mr: 1,
+                }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {currentCategory.color}
+              </Typography>
+            </Box>
+          </Paper>
 
           {!editMode && (
             <Box sx={{ mt: 3 }}>

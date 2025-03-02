@@ -74,9 +74,35 @@ class ApiService {
 
   // Transactions
   async getTransactions(params = {}) {
+    console.log("ApiService.getTransactions called with params:", params);
+
+    // Ensure date parameters are properly formatted
+    const requestParams = { ...params };
+
+    // Special handling for date parameters to ensure proper URL encoding
+    if (requestParams.start_date) {
+      console.log(`Original start_date: ${requestParams.start_date}`);
+      requestParams.start_date = encodeURIComponent(requestParams.start_date);
+    }
+
+    if (requestParams.end_date) {
+      console.log(`Original end_date: ${requestParams.end_date}`);
+      requestParams.end_date = encodeURIComponent(requestParams.end_date);
+    }
+
+    // Log the actual URL that will be called
+    const queryString = new URLSearchParams(requestParams).toString();
+    console.log(`GET /transactions with query params: ${queryString}`);
+
+    // Use axios directly with explicit query string to ensure parameters are sent correctly
     return this.handleRequest(() =>
-      this.client.get("/transactions", { params })
-    );
+      this.client.get(`/transactions?${queryString}`)
+    ).then((data) => {
+      console.log(
+        `getTransactions response: ${data.length} transactions received`
+      );
+      return data;
+    });
   }
 
   async getTransaction(id) {
@@ -136,7 +162,63 @@ class ApiService {
 
   // Budgets
   async getBudgets(params = {}) {
-    return this.handleRequest(() => this.client.get("/budgets", { params }));
+    console.log("ApiService.getBudgets called with params:", params);
+
+    // Create a new object for the parameters to avoid modifying the original
+    const requestParams = { ...params };
+
+    // Special handling for date parameters to ensure proper formatting
+    if (requestParams.start_date) {
+      console.log(`Original start_date: ${requestParams.start_date}`);
+      // Ensure date is in ISO format for consistency
+      if (requestParams.start_date instanceof Date) {
+        requestParams.start_date = requestParams.start_date.toISOString();
+      }
+      requestParams.start_date = encodeURIComponent(requestParams.start_date);
+    }
+
+    if (requestParams.end_date) {
+      console.log(`Original end_date: ${requestParams.end_date}`);
+      // Ensure date is in ISO format for consistency
+      if (requestParams.end_date instanceof Date) {
+        requestParams.end_date = requestParams.end_date.toISOString();
+      }
+      requestParams.end_date = encodeURIComponent(requestParams.end_date);
+    }
+
+    // Special handling for month_year parameter - make sure it's passed clearly
+    if (requestParams.month_year) {
+      console.log(`Using month_year parameter: ${requestParams.month_year}`);
+      // month_year should remain as YYYY-MM format
+      requestParams.month_year = encodeURIComponent(requestParams.month_year);
+    }
+
+    // Log the actual URL that will be called
+    const queryString = new URLSearchParams(requestParams).toString();
+    console.log(
+      `GET /budgets API call: ${this.baseUrl}/budgets?${queryString}`
+    );
+
+    // Explicit handling of the response for debugging
+    try {
+      const response = await this.client.get(`/budgets?${queryString}`);
+      const data = response.data;
+
+      console.log(`getBudgets response: ${data.length} budgets retrieved`);
+
+      // Log a sample of budgets for debugging (first 2)
+      if (data.length > 0) {
+        console.log("Sample budget data:", data.slice(0, 2));
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error in getBudgets API call:", error);
+      if (error.response) {
+        console.error("Server response:", error.response.data);
+      }
+      throw error;
+    }
   }
 
   async getBudget(id) {
